@@ -2,11 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Volume, Volume1, Volume2, Maximize2 } from 'lucide-react';
 import usePlayerStore from '../store/playerStore';
 
-export default function Player() {
-  const { currentTrack, isPlaying, volume, repeat, shuffle,
-    togglePlay, nextTrack, prevTrack, setRepeat, setShuffle, setVolume } = usePlayerStore();
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
+export default function Player({ onFullscreen }) {
+  const { currentTrack, isPlaying, volume, repeat, shuffle, progress, duration,
+    togglePlay, nextTrack, prevTrack, setRepeat, setShuffle, setVolume, setProgress, setDuration } = usePlayerStore();
   const playerRef = useRef(null);
   const ytPlayer = useRef(null);
   const [ready, setReady] = useState(false);
@@ -43,6 +41,12 @@ export default function Player() {
   }, []);
 
   useEffect(() => { window.__ytPlay = ytPlay; }, [ytPlay]);
+
+  useEffect(() => {
+    window.__ytSeek = (time) => {
+      if (ytPlayer.current) ytPlayer.current.seekTo(time, true);
+    };
+  }, []);
 
   useEffect(() => {
     if (!ytPlayer.current) return;
@@ -98,7 +102,7 @@ export default function Player() {
       <div className="h-[64px] sm:h-[72px] bg-spotify-black border-t border-[#282828] flex flex-col sm:flex-row items-center px-2 sm:px-4 z-50 shrink-0">
         {currentTrack ? (
           <>
-            <div className="flex items-center gap-3 w-full sm:w-[30%] min-w-0 mb-2 sm:mb-0">
+            <div className="flex items-center gap-3 w-full sm:w-[30%] min-w-0 mb-2 sm:mb-0 cursor-pointer" onClick={onFullscreen}>
               <img src={currentTrack.thumbnail} className="w-10 h-10 sm:w-14 sm:h-14 rounded object-cover shrink-0" alt="" />
               <div className="min-w-0">
                 <p className="text-xs sm:text-sm font-medium truncate">{currentTrack.title}</p>
@@ -132,7 +136,7 @@ export default function Player() {
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow" />
                 </div>
               </div>
-              <Maximize2 size={14} className="text-spotify-text hover:text-white cursor-pointer" />
+              <Maximize2 size={14} className="text-spotify-text hover:text-white cursor-pointer" onClick={onFullscreen} />
             </div>
           </>
         ) : (
