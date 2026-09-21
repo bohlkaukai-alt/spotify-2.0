@@ -62,7 +62,7 @@ export default function Player({ onFullscreen }) {
 
   return (
     <div className="h-[64px] sm:h-[72px] bg-spotify-black border-t border-[#282828] flex flex-col sm:flex-row items-center px-2 sm:px-4 z-50 shrink-0">
-      <audio ref={audio} crossOrigin="anonymous"
+      <audio ref={audio}
         onTimeUpdate={(e) => setProgress(e.target.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.target.duration)}
         onEnded={nextTrack}
