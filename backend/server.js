@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { exec, spawn } = require('child_process');
+const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -9,6 +10,10 @@ const YTDLP = process.env.YTDLP_PATH || 'yt-dlp';
 
 app.use(cors());
 app.use(express.json());
+
+// Serve frontend build
+const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
+app.use(express.static(frontendBuild));
 
 // ─── Health ────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
@@ -246,4 +251,9 @@ function parseChannelVideos(stdout) {
 
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
+});
+
+// Catch-all: serve frontend for any non-API route
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendBuild, 'index.html'));
 });
