@@ -1,4 +1,4 @@
-import { Home, Search, Library, Plus, User } from 'lucide-react';
+import { Home, Search, Library, Plus, User, Cloud } from 'lucide-react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import db from '../lib/db';
@@ -33,12 +33,12 @@ export default function Sidebar({ onNavigate }) {
   };
 
   return (
-    <div className="w-64 bg-[#0a0a0a] sm:bg-[#0d0d0d] flex flex-col p-2 gap-1 h-full shrink-0 border-r border-[#141414]">
+    <div className="w-64 bg-[#0a0a0a] sm:bg-[#0d0d0d] flex flex-col h-full shrink-0 border-r border-[#141414]">
       <div className="px-4 py-3 hidden sm:block">
         <span className="text-xl font-bold tracking-tight text-white">♫ Spotify 2.0</span>
       </div>
 
-      <nav className="flex flex-col gap-0.5">
+      <nav className="flex flex-col gap-0.5 px-2 pt-1">
         {navItems.map(({ to, icon: Icon, label }) => {
           const active = location.pathname === to;
           return (
@@ -49,18 +49,10 @@ export default function Sidebar({ onNavigate }) {
             </button>
           );
         })}
-        <button onClick={() => handleClick('/auth')}
-          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-left
-            ${location.pathname === '/auth' ? 'bg-[#1a1a1a] text-white' : 'text-[var(--text-dim)] hover:text-white hover:bg-[#141414]'}`}>
-          <div className="w-5 h-5 rounded-full bg-[var(--green)] flex items-center justify-center text-black text-[10px] font-bold">
-            {user ? user.email?.[0]?.toUpperCase() || '?' : <User size={12} />}
-          </div>
-          {user ? 'Konto' : 'Anmelden'}
-        </button>
       </nav>
 
-      <div className="mt-6 flex flex-col flex-1 overflow-hidden">
-        <div className="flex items-center justify-between px-4 mb-3">
+      <div className="px-2 mt-4 flex flex-col flex-1 overflow-hidden">
+        <div className="flex items-center justify-between px-4 mb-2">
           <span className="text-[var(--text-dim)] text-[11px] font-semibold uppercase tracking-wider">Playlists</span>
           <button onClick={createPlaylist}
             className="w-7 h-7 flex items-center justify-center text-[var(--text-dim)] hover:text-white hover:bg-[#1a1a1a] rounded-md transition-all">
@@ -83,6 +75,32 @@ export default function Sidebar({ onNavigate }) {
             })
           )}
         </div>
+      </div>
+
+      {/* Account Button - always visible at bottom */}
+      <div className="px-2 pb-3 pt-2 border-t border-[#1a1a1a]">
+        <button onClick={() => handleClick('/auth')}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left
+            ${location.pathname === '/auth' ? 'bg-[#1a1a1a] text-white' : 'text-[var(--text-dim)] hover:text-white hover:bg-[#141414]'}`}>
+          {user ? (
+            <>
+              <div className="w-8 h-8 rounded-full bg-[var(--green)] flex items-center justify-center text-black text-xs font-bold shrink-0">
+                {user.email?.[0]?.toUpperCase() || '?'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-white text-sm font-semibold truncate">{user.email}</p>
+                <p className="text-[10px] text-[var(--green)] flex items-center gap-1"><Cloud size={10} /> Cloud sync</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center shrink-0">
+                <User size={16} className="text-[var(--text-dim)]" />
+              </div>
+              <span>Anmelden</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
