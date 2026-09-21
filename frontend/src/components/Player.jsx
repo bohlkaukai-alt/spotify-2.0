@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Volume, Volume1, Volume2, Maximize2, ListMusic } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Volume, Volume1, Volume2, Maximize2 } from 'lucide-react';
 import usePlayerStore from '../store/playerStore';
 
 export default function Player({ onFullscreen }) {
@@ -71,17 +71,65 @@ export default function Player({ onFullscreen }) {
     return () => clearInterval(iv);
   }, [isPlaying]);
 
+  // Background playback: resume when page becomes visible again
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const st = usePlayerStore.getState();
+        if (st.isPlaying && ytPlayer.current) {
+          ytPlayer.current.playVideo();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
+  // Keep audio alive: periodic heartbeat when playing
+  useEffect(() => {
+    if (!isPlaying || !ytPlayer.current) return;
+    const heartbeat = setInterval(() => {
+      if (ytPlayer.current && typeof ytPlayer.current.playVideo === 'function') {
+        const state = ytPlayer.current.getPlayerState?.();
+        if (state === 2) {
+          ytPlayer.current.playVideo();
+        }
+      }
+    }, 3000);
+    return () => clearInterval(heartbeat);
+  }, [isPlaying]);
+
+  // Media Session API: background controls + lock screen
   useEffect(() => {
     if (!('mediaSession' in navigator) || !currentTrack) return;
+
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentTrack.title, artist: currentTrack.artist,
+      title: currentTrack.title,
+      artist: currentTrack.artist,
       artwork: [{ src: currentTrack.thumbnail, sizes: '300x300', type: 'image/jpeg' }],
     });
-    navigator.mediaSession.setActionHandler('play', () => usePlayerStore.getState().togglePlay());
-    navigator.mediaSession.setActionHandler('pause', () => usePlayerStore.getState().togglePlay());
+
+    navigator.mediaSession.setActionHandler('play', () => {
+      const st = usePlayerStore.getState();
+      if (!st.isPlaying) st.togglePlay();
+      if (ytPlayer.current) ytPlayer.current.playVideo();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      const st = usePlayerStore.getState();
+      if (st.isPlaying) st.togglePlay();
+    });
     navigator.mediaSession.setActionHandler('previoustrack', () => usePlayerStore.getState().prevTrack());
     navigator.mediaSession.setActionHandler('nexttrack', () => usePlayerStore.getState().nextTrack());
-  }, [currentTrack]);
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime != null && ytPlayer.current) {
+        ytPlayer.current.seekTo(details.seekTime, true);
+        setProgress(details.seekTime);
+      }
+    });
+
+    // Tell browser we are playing
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [currentTrack, isPlaying]);
 
   const fmt = (s) => {
     if (!s || isNaN(s)) return '0:00';
