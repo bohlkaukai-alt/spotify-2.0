@@ -12,6 +12,7 @@ const usePlayerStore = create((set, get) => ({
 
   setTrack: (track) => set({ currentTrack: track, isPlaying: true }),
   togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
+  setIsPlaying: (v) => set({ isPlaying: v }),
   setVolume: (v) => set({ volume: v }),
   setProgress: (p) => set({ progress: p }),
   setDuration: (d) => set({ duration: d }),
