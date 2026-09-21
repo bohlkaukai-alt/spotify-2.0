@@ -1,14 +1,14 @@
-const PIPED = 'https://pipedapi.kavin.rocks';
+const INSTANCES = ['https://invidious.f5.si', 'https://iv.datura.network', 'https://invidious.nerdvpn.de', 'https://yt.cdaut.de'];
+const API = INSTANCES[0];
 
-function mapVideo(v) {
-  return {
-    id: (v.url || '').split('v=')[1] || (v.url || '').split('/').pop() || v.uid || '',
-    title: v.title || 'Unknown',
-    artist: v.uploaderName || v.uploader || 'Unknown',
-    artistId: (v.uploaderUrl || '').split('/channel/')[1] || (v.uploaderUrl || '').split('/@')[1] || '',
-    album: '', duration: v.duration || 0,
-    thumbnail: v.thumbnail || '', viewCount: v.views || 0,
-  };
+async function tryFetch(path) {
+  for (const inst of INSTANCES) {
+    try {
+      const r = await fetch(`${inst}${path}`, { signal: AbortSignal.timeout(8000) });
+      if (r.ok) return await r.json();
+    } catch {}
+  }
+  throw new Error('All Invidious instances failed');
 }
 
 module.exports = async function handler(req, res) {
@@ -21,43 +21,54 @@ module.exports = async function handler(req, res) {
 
   try {
     if (action === 'search' && q.q) {
-      const r = await fetch(`${PIPED}/search?q=${encodeURIComponent(q.q)}&filter=videos`);
-      const data = await r.json();
-      return res.json((data.items || []).slice(0, parseInt(q.limit || '25')).map(mapVideo));
+      const data = await tryFetch(`/api/v1/search?q=${encodeURIComponent(q.q)}&type=video&sort_by=relevance`);
+      const results = (Array.isArray(data) ? data : data.filter?.(v => v.type === 'video') || []).slice(0, parseInt(q.limit || '25'));
+      return res.json(results.map(v => ({
+        id: v.videoId || '', title: v.title || 'Unknown',
+        artist: v.author || 'Unknown', artistId: (v.authorId || '').replace('UC', ''),
+        album: '', duration: v.lengthSeconds || 0,
+        thumbnail: v.videoThumbnails?.[0]?.url || '', viewCount: v.viewCount || 0,
+      })));
     }
 
     if (action === 'search-artists' && q.q) {
-      const r = await fetch(`${PIPED}/search?q=${encodeURIComponent(q.q)}&filter=channels`);
-      const data = await r.json();
-      return res.json((data.items || []).slice(0, parseInt(q.limit || '10')).map(ch => ({
-        id: (ch.url || '').split('/channel/')[1] || (ch.url || '').split('/@')[1] || '',
-        name: ch.name || 'Unknown', thumbnail: ch.thumbnail || '',
-        subscriberCount: ch.subscribers || 0,
+      const data = await tryFetch(`/api/v1/search?q=${encodeURIComponent(q.q)}&type=channel`);
+      const channels = (Array.isArray(data) ? data : []).slice(0, parseInt(q.limit || '10'));
+      return res.json(channels.map(ch => ({
+        id: ch.authorId || '', name: ch.author || 'Unknown',
+        thumbnail: ch.authorThumbnails?.[0]?.url || '',
+        subscriberCount: parseInt(ch.subCountText) || 0,
       })));
     }
 
     if (action === 'artist-info' && q.channelId) {
-      const r = await fetch(`${PIPED}/channel/${q.channelId}`);
-      const data = await r.json();
-      return res.json({ id: q.channelId, name: data.name || 'Unknown',
-        thumbnail: data.thumbnail || '', subscriberCount: data.subscribers || 0 });
+      const ucId = q.channelId.startsWith('UC') ? q.channelId : 'UC' + q.channelId;
+      const data = await tryFetch(`/api/v1/channels/${ucId}`);
+      return res.json({
+        id: ucId, name: data.author || 'Unknown',
+        thumbnail: data.authorThumbnails?.[0]?.url || '',
+        subscriberCount: parseInt(data.subCountText) || 0,
+      });
     }
 
     if (action === 'artist-songs' && q.channelId) {
-      const r = await fetch(`${PIPED}/channel/${q.channelId}`);
-      const data = await r.json();
-      const videos = (data.relatedStreams || []).filter(v => v.type === 'stream');
-      return res.json(videos.slice(0, parseInt(q.limit || '100')).map(mapVideo));
+      const ucId = q.channelId.startsWith('UC') ? q.channelId : 'UC' + q.channelId;
+      const data = await tryFetch(`/api/v1/channels/${ucId}/videos`);
+      const videos = (data || []).slice(0, parseInt(q.limit || '100'));
+      return res.json(videos.map(v => ({
+        id: v.videoId || '', title: v.title || 'Unknown',
+        artist: v.author || 'Unknown', artistId: ucId.replace('UC', ''),
+        album: '', duration: v.lengthSeconds || 0,
+        thumbnail: v.videoThumbnails?.[0]?.url || '', viewCount: v.viewCount || 0,
+      })));
     }
 
     if (action === 'stream' && q.id) {
-      const r = await fetch(`${PIPED}/streams/${q.id}`);
-      const data = await r.json();
-      const audioStreams = data.audioStreams || [];
+      const data = await tryFetch(`/api/v1/videos/${q.id}`);
+      const audioStreams = (data.adaptiveFormats || []).filter(f => f.type && f.type.startsWith('audio/'));
       if (!audioStreams.length) return res.status(404).json({ error: 'No audio found' });
       const best = audioStreams.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-      // Return stream URL for client-side playback
-      return res.json({ url: best.url, type: best.mimeType || 'audio/webm' });
+      return res.json({ url: best.url, type: best.type || 'audio/webm' });
     }
 
     res.status(400).json({ error: 'Invalid action' });
