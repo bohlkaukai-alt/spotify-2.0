@@ -1,4 +1,4 @@
-const CACHE = 'spotify-v1';
+const CACHE = 'spotify-v2';
 const PRECACHE = ['/', '/index.html'];
 
 self.addEventListener('install', (e) => {
