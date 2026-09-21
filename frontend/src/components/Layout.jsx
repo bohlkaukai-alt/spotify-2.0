@@ -2,7 +2,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Player from './Player';
 
-export default function Layout() {
+export default function Layout({ onFullscreen }) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex flex-1 overflow-hidden">
@@ -11,7 +11,7 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
-      <Player />
+      <Player onFullscreen={onFullscreen} />
     </div>
   );
 }

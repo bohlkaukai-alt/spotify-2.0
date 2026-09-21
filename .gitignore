@@ -4,3 +4,5 @@ dist/
 *.m4a
 *.mp3
 *.webm
+
+.vercel
