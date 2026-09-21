@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Volume, Volume1, Volume2, Maximize2 } from 'lucide-react';
 import usePlayerStore from '../store/playerStore';
+import { getStreamUrl } from '../lib/api';
 
 export default function Player({ onFullscreen }) {
   const audio = useRef(null);
@@ -13,7 +14,7 @@ export default function Player({ onFullscreen }) {
   useEffect(() => {
     if (!currentTrack || !audio.current) return;
     const el = audio.current;
-    el.src = `/api/stream/${currentTrack.id}`;
+      el.src = getStreamUrl(currentTrack.id);
     el.load();
     const onReady = () => { el.play().catch(() => {}); };
     el.addEventListener('loadeddata', onReady, { once: true });

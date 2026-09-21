@@ -1,5 +1,7 @@
+import { getStreamUrl } from '../lib/api';
+
 export async function downloadTrack(track) {
-  const res = await fetch(`/api/stream/${track.id}`);
+  const res = await fetch(getStreamUrl(track.id));
   if (!res.ok) throw new Error('Download fehlgeschlagen');
 
   const blob = await res.blob();

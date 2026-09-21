@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Search as SearchIcon, Loader2, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import TrackList from '../components/TrackList';
+import { searchSongs, searchArtists } from '../lib/api';
 
 const CATEGORIES = [
   { label: 'Pop', query: 'pop hits 2024 best songs', color: '#E13300' },
@@ -33,12 +34,12 @@ export default function Search() {
     setLoading(true);
     setSearched(true);
     try {
-      const [tracksRes, artistsRes] = await Promise.all([
-        fetch(`/api/search?q=${encodeURIComponent(searchTerm)}&limit=25`),
-        fetch(`/api/search-artists?q=${encodeURIComponent(searchTerm)}&limit=6`),
+      const [tracksData, artistsData] = await Promise.all([
+        searchSongs(searchTerm, 25),
+        searchArtists(searchTerm, 6),
       ]);
-      if (tracksRes.ok) setTracks(await tracksRes.json());
-      if (artistsRes.ok) setArtists(await artistsRes.json());
+      setTracks(tracksData);
+      setArtists(artistsData);
     } catch (err) {
       setTracks([]);
       setArtists([]);

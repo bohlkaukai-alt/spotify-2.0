@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Play, ArrowLeft, User } from 'lucide-react';
 import usePlayerStore from '../store/playerStore';
 import TrackList from '../components/TrackList';
+import { getArtistInfo, getArtistSongs } from '../lib/api';
 
 export default function Artist() {
   const { channelId } = useParams();
@@ -17,12 +18,12 @@ export default function Artist() {
   const loadArtist = async () => {
     setLoading(true);
     try {
-      const [artistRes, songsRes] = await Promise.all([
-        fetch(`/api/artist-info?channelId=${channelId}`),
-        fetch(`/api/artist-songs?channelId=${channelId}&limit=100`),
+      const [artistData, songsData] = await Promise.all([
+        getArtistInfo(channelId),
+        getArtistSongs(channelId, 100),
       ]);
-      if (artistRes.ok) setArtist(await artistRes.json());
-      if (songsRes.ok) setSongs(await songsRes.json());
+      setArtist(artistData);
+      setSongs(songsData);
     } catch (err) {
       console.error('Failed to load artist:', err);
     }
