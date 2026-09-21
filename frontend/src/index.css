@@ -2,63 +2,98 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+:root {
+  --green: #1ed760;
+  --green-dim: #1aa34a;
+  --bg: #0a0a0a;
+  --bg-card: #141414;
+  --bg-elevated: #1a1a1a;
+  --text: #e0e0e0;
+  --text-dim: #7f7f7f;
+  --border: #282828;
 }
 
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
 body {
-  margin: 0;
-  padding: 0;
-  background: #121212;
-  color: white;
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--text);
   font-family: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-}
-
-/* Range sliders - always visible */
 .player-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
-  cursor: pointer;
-  height: 12px;
+  -webkit-appearance: none; appearance: none;
+  background: transparent; cursor: pointer; height: 12px;
 }
-
 .player-slider::-webkit-slider-runnable-track {
-  height: 4px;
-  background: #4d4d4d;
-  border-radius: 2px;
+  height: 4px; background: #3e3e3e; border-radius: 2px;
 }
-
 .player-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
-  background: white;
-  border-radius: 50%;
-  margin-top: -4px;
-  opacity: 1;
+  -webkit-appearance: none; width: 12px; height: 12px;
+  background: white; border-radius: 50%; margin-top: -4px;
+  opacity: 0; transition: opacity 0.2s;
+}
+.player-slider:hover::-webkit-slider-thumb { opacity: 1; }
+.player-slider:hover::-webkit-slider-runnable-track { background: var(--green); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.player-slider:hover::-webkit-slider-runnable-track {
-  background: #1DB954;
+.animate-fadeUp { animation: fadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slideUp { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-pulse-slow { animation: pulse 2s ease-in-out infinite; }
+
+.track-row {
+  transition: background-color 0.15s ease, transform 0.15s ease;
 }
+.track-row:active {
+  transform: scale(0.98);
+  background-color: rgba(255,255,255,0.08);
+}
+
+.glass {
+  background: rgba(20,20,20,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.gradient-border {
+  position: relative;
+}
+.gradient-border::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(30,215,96,0.3), transparent);
+}
+
+.safe-top { padding-top: max(env(safe-area-inset-top, 0px), 8px); }
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px); }

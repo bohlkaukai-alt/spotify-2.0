@@ -5,9 +5,7 @@ import db from '../lib/db';
 
 export default function FullscreenView({ onClose }) {
   const { currentTrack, isPlaying, togglePlay, nextTrack, prevTrack, repeat, shuffle,
-    setRepeat, setShuffle } = usePlayerStore();
-  const [progress, setLocalProgress] = useState(0);
-  const [duration, setLocalDuration] = useState(0);
+    progress, duration, cycleRepeat, setShuffle, setProgress, setDuration } = usePlayerStore();
   const [liked, setLiked] = useState(false);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [playlists, setPlaylists] = useState([]);
@@ -21,12 +19,7 @@ export default function FullscreenView({ onClose }) {
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    const iv = setInterval(() => {
-      const st = usePlayerStore.getState();
-      setLocalProgress(st.progress || 0);
-      setLocalDuration(st.duration || 0);
-    }, 500);
-    return () => { document.body.style.overflow = ''; clearInterval(iv); };
+    return () => { document.body.style.overflow = ''; };
   }, []);
 
   const toggleLike = async () => {
@@ -56,7 +49,7 @@ export default function FullscreenView({ onClose }) {
       });
     }
     setShowPlaylistMenu(false);
-    setToast('Zur Playlist hinzugefügt!');
+    setToast('Hinzugefügt!');
     setTimeout(() => setToast(''), 2000);
   };
 
@@ -65,7 +58,7 @@ export default function FullscreenView({ onClose }) {
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const newTime = pct * (duration || 0);
     if (window.__ytSeek) window.__ytSeek(newTime);
-    setLocalProgress(newTime);
+    setProgress(newTime);
   };
 
   const fmt = (s) => {
@@ -74,42 +67,40 @@ export default function FullscreenView({ onClose }) {
   };
 
   const RepeatIcon = repeat === 'one' ? Repeat1 : Repeat;
+  const repeatLabel = repeat === 'all' ? 'Playlist' : repeat === 'one' ? '1 Song' : 'Aus';
 
   if (!currentTrack) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col"
-      style={{
-        backgroundColor: '#121212',
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }}>
+    <div className="fixed inset-0 z-[200] flex flex-col animate-slideUp"
+      style={{ backgroundColor: '#0a0a0a' }}>
 
       {toast && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-spotify-green text-black px-4 py-2 rounded-full text-sm font-medium z-50 shadow-lg">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-[var(--green)] text-black px-5 py-2 rounded-full text-sm font-semibold z-50 shadow-lg animate-fadeUp">
           {toast}
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-3 pb-1 shrink-0" style={{ paddingTop: 'max(env(safe-area-inset-top, 12px), 12px)' }}>
-        <button onClick={onClose} className="text-white p-1">
-          <ChevronDown size={30} />
+      <div className="flex items-center justify-between px-5 safe-top shrink-0">
+        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-transform">
+          <ChevronDown size={28} />
         </button>
-        <span className="text-[11px] text-spotify-text uppercase tracking-widest font-medium">Jetzt abgespielt</span>
+        <span className="text-[11px] text-[var(--text-dim)] uppercase tracking-[0.2em] font-medium">Jetzt abgespielt</span>
         <div className="relative">
-          <button onClick={() => setShowPlaylistMenu(!showPlaylistMenu)} className="text-white p-1">
-            <ListPlus size={24} />
+          <button onClick={() => setShowPlaylistMenu(!showPlaylistMenu)}
+            className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-transform">
+            <ListPlus size={22} />
           </button>
           {showPlaylistMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowPlaylistMenu(false)} />
-              <div className="absolute top-full right-0 mt-1 bg-[#282828] rounded-lg shadow-2xl z-50 w-56 py-2 max-h-64 overflow-y-auto">
-                <p className="px-4 py-2 text-xs text-spotify-text uppercase font-medium">Zur Playlist</p>
-                {playlists.length === 0 && <p className="px-4 py-2 text-sm text-spotify-text">Keine Playlists</p>}
+              <div className="absolute top-full right-0 mt-2 bg-[#1f1f1f] rounded-xl shadow-2xl z-50 w-56 py-2 border border-[#2a2a2a] animate-fadeUp">
+                <p className="px-4 py-2 text-[10px] text-[var(--text-dim)] uppercase tracking-wider font-medium">Zur Playlist</p>
+                {playlists.length === 0 && <p className="px-4 py-2 text-sm text-[var(--text-dim)]">Keine Playlists</p>}
                 {playlists.map(pl => (
                   <button key={pl.id} onClick={() => addToPlaylist(pl.id)}
-                    className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#ffffff15] truncate">
+                    className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors truncate">
                     {pl.name}
                   </button>
                 ))}
@@ -120,61 +111,63 @@ export default function FullscreenView({ onClose }) {
       </div>
 
       {/* Album Art */}
-      <div className="flex-1 flex items-center justify-center px-10 min-h-0">
+      <div className="flex-1 flex items-center justify-center px-12 min-h-0">
         <img src={currentTrack.thumbnail} alt=""
-          className="w-full max-w-[320px] aspect-square rounded-xl object-cover shadow-2xl" />
+          className="w-full max-w-[300px] aspect-square rounded-2xl object-cover shadow-2xl animate-fadeUp" />
       </div>
 
       {/* Track Info + Like */}
-      <div className="px-6 mb-3 shrink-0">
+      <div className="px-6 mb-4 shrink-0 animate-fadeUp" style={{ animationDelay: '0.05s' }}>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-bold text-white truncate leading-tight">{currentTrack.title}</h2>
-            <p className="text-sm text-spotify-text truncate mt-0.5">{currentTrack.artist}</p>
+            <p className="text-sm text-[var(--text-dim)] truncate mt-0.5">{currentTrack.artist}</p>
           </div>
-          <button onClick={toggleLike} className="shrink-0 p-1">
-            <Heart size={26} className={liked ? 'text-spotify-green' : 'text-spotify-text'}
+          <button onClick={toggleLike} className="shrink-0 p-2 active:scale-90 transition-transform">
+            <Heart size={24} className={liked ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'}
               fill={liked ? 'currentColor' : 'none'} />
           </button>
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="px-6 mb-2 shrink-0">
-        <div className="w-full h-1.5 bg-[#4d4d4d] rounded-full cursor-pointer" onClick={seek}>
-          <div className="h-full bg-white rounded-full relative transition-all"
+      {/* Progress */}
+      <div className="px-6 mb-3 shrink-0 animate-fadeUp" style={{ animationDelay: '0.1s' }}>
+        <div className="w-full h-1.5 bg-[#2a2a2a] rounded-full cursor-pointer group" onClick={seek}>
+          <div className="h-full bg-white group-hover:bg-[var(--green)] rounded-full relative transition-all"
             style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }}>
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-md" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>
         <div className="flex justify-between mt-1.5">
-          <span className="text-[11px] text-spotify-text tabular-nums">{fmt(progress)}</span>
-          <span className="text-[11px] text-spotify-text tabular-nums">{duration ? `-${fmt(duration - progress)}` : '0:00'}</span>
+          <span className="text-[11px] text-[var(--text-dim)] tabular-nums">{fmt(progress)}</span>
+          <span className="text-[11px] text-[var(--text-dim)] tabular-nums">{duration ? `-${fmt(duration - progress)}` : '0:00'}</span>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-between px-10 pb-6 shrink-0"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 24px), 24px)' }}>
+      <div className="flex items-center justify-between px-8 safe-bottom shrink-0 animate-fadeUp" style={{ animationDelay: '0.15s' }}>
         <button onClick={setShuffle}
-          className={shuffle ? 'text-spotify-green' : 'text-spotify-text'}>
+          className={`p-2 active:scale-90 transition-all ${shuffle ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'}`}>
           <Shuffle size={20} />
         </button>
         <button onClick={prevTrack} className="text-white active:scale-90 transition-transform">
-          <SkipBack size={32} fill="white" />
+          <SkipBack size={34} fill="currentColor" />
         </button>
         <button onClick={togglePlay}
-          className="w-16 h-16 bg-white rounded-full flex items-center justify-center active:scale-95 shadow-lg">
+          className="w-16 h-16 bg-white rounded-full flex items-center justify-center active:scale-95 transition-all shadow-xl">
           {isPlaying
             ? <Pause size={30} className="text-black" fill="black" />
             : <Play size={30} className="text-black ml-1" fill="black" />}
         </button>
         <button onClick={nextTrack} className="text-white active:scale-90 transition-transform">
-          <SkipForward size={32} fill="white" />
+          <SkipForward size={34} fill="currentColor" />
         </button>
-        <button onClick={setRepeat}
-          className={repeat !== 'off' ? 'text-spotify-green' : 'text-spotify-text'}>
+        <button onClick={cycleRepeat} title={repeatLabel}
+          className={`p-2 active:scale-90 transition-all relative ${repeat !== 'off' ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'}`}>
           <RepeatIcon size={20} />
+          {repeat === 'one' && (
+            <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold text-[var(--green)]">1</span>
+          )}
         </button>
       </div>
     </div>

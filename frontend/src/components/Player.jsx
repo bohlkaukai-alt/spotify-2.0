@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Volume, Volume1, Volume2, Maximize2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Volume, Volume1, Volume2, Maximize2, ListMusic } from 'lucide-react';
 import usePlayerStore from '../store/playerStore';
 
 export default function Player({ onFullscreen }) {
   const { currentTrack, isPlaying, volume, repeat, shuffle, progress, duration,
-    togglePlay, nextTrack, prevTrack, setRepeat, setShuffle, setVolume, setProgress, setDuration } = usePlayerStore();
+    togglePlay, nextTrack, prevTrack, cycleRepeat, setShuffle, setVolume, setProgress, setDuration } = usePlayerStore();
   const playerRef = useRef(null);
   const ytPlayer = useRef(null);
   const [ready, setReady] = useState(false);
@@ -26,8 +26,12 @@ export default function Player({ onFullscreen }) {
         onStateChange: (e) => {
           if (e.data === window.YT.PlayerState.ENDED) {
             const st = usePlayerStore.getState();
-            if (st.repeat === 'one') { ytPlayer.current.seekTo(0, true); ytPlayer.current.playVideo(); }
-            else st.nextTrack();
+            if (st.repeat === 'one') {
+              ytPlayer.current.seekTo(0, true);
+              ytPlayer.current.playVideo();
+            } else {
+              st.nextTrack();
+            }
           }
         },
       },
@@ -37,7 +41,7 @@ export default function Player({ onFullscreen }) {
   const ytPlay = useCallback((videoId) => {
     if (!ytPlayer.current) return;
     ytPlayer.current.loadVideoById({ videoId, suggestedQuality: 'small' });
-    setProgress(0);
+    usePlayerStore.getState().setProgress(0);
   }, []);
 
   useEffect(() => { window.__ytPlay = ytPlay; }, [ytPlay]);
@@ -96,55 +100,103 @@ export default function Player({ onFullscreen }) {
     setProgress(pct * duration);
   };
 
+  const repeatLabel = repeat === 'all' ? 'Playlist wiederholen' : repeat === 'one' ? 'Song wiederholen' : 'Wiederholen';
+
   return (
     <>
       <div ref={playerRef} style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }} />
-      <div className="h-[64px] sm:h-[72px] bg-spotify-black border-t border-[#282828] flex flex-col sm:flex-row items-center px-2 sm:px-4 z-50 shrink-0">
+
+      {/* Desktop Player */}
+      <div className="hidden sm:flex h-[72px] bg-[#0d0d0d] border-t border-[#1f1f1f] items-center px-4 z-50 shrink-0 gradient-border">
         {currentTrack ? (
           <>
-            <div className="flex items-center gap-3 w-full sm:w-[30%] min-w-0 mb-2 sm:mb-0 cursor-pointer" onClick={onFullscreen}>
-              <img src={currentTrack.thumbnail} className="w-10 h-10 sm:w-14 sm:h-14 rounded object-cover shrink-0" alt="" />
+            <div className="flex items-center gap-3 w-[30%] min-w-0 cursor-pointer group" onClick={onFullscreen}>
+              <img src={currentTrack.thumbnail}
+                className="w-14 h-14 rounded-lg object-cover shadow-lg group-hover:shadow-xl transition-shadow" alt="" />
               <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-medium truncate">{currentTrack.title}</p>
-                <p className="text-[10px] sm:text-xs text-spotify-text truncate">{currentTrack.artist}</p>
+                <p className="text-sm font-semibold text-white truncate group-hover:text-[var(--green)] transition-colors">{currentTrack.title}</p>
+                <p className="text-xs text-[var(--text-dim)] truncate">{currentTrack.artist}</p>
               </div>
             </div>
-            <div className="flex flex-col items-center flex-1 w-full sm:w-auto">
-              <div className="flex items-center gap-2 sm:gap-4 mb-0.5 sm:mb-1">
-                <Shuffle size={14} className={`cursor-pointer hidden sm:block ${shuffle ? 'text-spotify-green' : 'text-spotify-text hover:text-white'}`} onClick={setShuffle} />
-                <SkipBack size={16} className="cursor-pointer text-spotify-text hover:text-white" onClick={prevTrack} />
-                <button onClick={togglePlay} className="w-7 h-7 sm:w-8 sm:h-8 bg-white rounded-full flex items-center justify-center hover:scale-105">
-                  {isPlaying ? <Pause size={16} className="text-black" fill="black" /> : <Play size={16} className="text-black ml-0.5" fill="black" />}
+            <div className="flex flex-col items-center flex-1 w-auto">
+              <div className="flex items-center gap-4 mb-1">
+                <button onClick={setShuffle}
+                  className={`transition-colors ${shuffle ? 'text-[var(--green)]' : 'text-[var(--text-dim)] hover:text-white'}`}>
+                  <Shuffle size={16} />
                 </button>
-                <SkipForward size={16} className="cursor-pointer text-spotify-text hover:text-white" onClick={nextTrack} />
-                <RepeatIcon size={14} className={`cursor-pointer hidden sm:block ${repeat !== 'off' ? 'text-spotify-green' : 'text-spotify-text hover:text-white'}`} onClick={setRepeat} />
+                <button onClick={prevTrack} className="text-[var(--text)] hover:text-white transition-colors">
+                  <SkipBack size={18} fill="currentColor" />
+                </button>
+                <button onClick={togglePlay}
+                  className="w-9 h-9 bg-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md">
+                  {isPlaying ? <Pause size={18} className="text-black" fill="black" />
+                    : <Play size={18} className="text-black ml-0.5" fill="black" />}
+                </button>
+                <button onClick={nextTrack} className="text-[var(--text)] hover:text-white transition-colors">
+                  <SkipForward size={18} fill="currentColor" />
+                </button>
+                <button onClick={cycleRepeat} title={repeatLabel}
+                  className={`transition-colors ${repeat !== 'off' ? 'text-[var(--green)]' : 'text-[var(--text-dim)] hover:text-white'}`}>
+                  <RepeatIcon size={16} />
+                </button>
               </div>
               <div className="flex items-center gap-2 w-full max-w-md">
-                <span className="text-[10px] sm:text-xs text-spotify-text w-8 sm:w-10 text-right">{fmt(progress)}</span>
-                <div className="player-slider flex-1 h-1 bg-[#4d4d4d] rounded-full cursor-pointer group" onClick={seekTo}>
-                  <div className="h-full bg-white group-hover:bg-spotify-green rounded-full relative" style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }}>
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow" />
+                <span className="text-[11px] text-[var(--text-dim)] w-10 text-right tabular-nums">{fmt(progress)}</span>
+                <div className="player-slider flex-1 h-1 bg-[#3e3e3e] rounded-full cursor-pointer group" onClick={seekTo}>
+                  <div className="h-full bg-white group-hover:bg-[var(--green)] rounded-full relative transition-colors"
+                    style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }}>
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow" />
                   </div>
                 </div>
-                <span className="text-[10px] sm:text-xs text-spotify-text w-8 sm:w-10">{duration ? `-${fmt(remaining)}` : '0:00'}</span>
+                <span className="text-[11px] text-[var(--text-dim)] w-10 tabular-nums">
+                  {duration ? `-${fmt(remaining > 0 ? remaining : 0)}` : '0:00'}
+                </span>
               </div>
             </div>
-            <div className="hidden sm:flex items-center gap-2 w-[30%] justify-end">
-              <VolumeIcon size={14} className="text-spotify-text" />
-              <div className="player-slider w-24 h-1 bg-[#4d4d4d] rounded-full cursor-pointer group" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setVolume((e.clientX - r.left) / r.width); }}>
-                <div className="h-full bg-white group-hover:bg-spotify-green rounded-full relative" style={{ width: `${volume * 100}%` }}>
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 shadow" />
+            <div className="flex items-center gap-2 w-[30%] justify-end">
+              <VolumeIcon size={16} className="text-[var(--text-dim)]" />
+              <div className="player-slider w-24 h-1 bg-[#3e3e3e] rounded-full cursor-pointer group"
+                onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setVolume((e.clientX - r.left) / r.width); }}>
+                <div className="h-full bg-white group-hover:bg-[var(--green)] rounded-full relative transition-colors"
+                  style={{ width: `${volume * 100}%` }}>
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow" />
                 </div>
               </div>
-              <Maximize2 size={14} className="text-spotify-text hover:text-white cursor-pointer" onClick={onFullscreen} />
+              <button onClick={onFullscreen} className="text-[var(--text-dim)] hover:text-white transition-colors ml-1">
+                <Maximize2 size={16} />
+              </button>
             </div>
           </>
         ) : (
           <div className="flex items-center justify-center w-full h-full">
-            <p className="text-spotify-text text-sm">Song auswählen zum Abspielen</p>
+            <p className="text-[var(--text-dim)] text-sm">Song auswählen zum Abspielen</p>
           </div>
         )}
       </div>
+
+      {/* Mobile Mini Player */}
+      {currentTrack && (
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 glass gradient-border"
+          onClick={onFullscreen}>
+          <div className="h-[56px] flex items-center gap-3 px-3">
+            <img src={currentTrack.thumbnail} className="w-10 h-10 rounded-lg object-cover shadow" alt="" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white truncate">{currentTrack.title}</p>
+              <p className="text-[11px] text-[var(--text-dim)] truncate">{currentTrack.artist}</p>
+            </div>
+            <button onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+              className="w-10 h-10 flex items-center justify-center">
+              {isPlaying ? <Pause size={22} className="text-white" fill="white" />
+                : <Play size={22} className="text-white ml-0.5" fill="white" />}
+            </button>
+          </div>
+          {/* Progress line */}
+          <div className="h-[2px] bg-[#3e3e3e]">
+            <div className="h-full bg-[var(--green)] transition-all duration-500"
+              style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }} />
+          </div>
+        </div>
+      )}
     </>
   );
 }
