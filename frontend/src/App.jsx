@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Heart, Maximize2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Heart } from 'lucide-react';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Search from './pages/Search';
@@ -25,7 +25,6 @@ export default function App() {
           <Route path="/artist/:channelId" element={<Artist />} />
         </Route>
       </Routes>
-
       {fullscreen && currentTrack && <FullscreenView onClose={() => setFullscreen(false)} />}
     </BrowserRouter>
   );
@@ -60,6 +59,13 @@ function FullscreenView({ onClose }) {
     return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
   };
 
+  const seek = (e) => {
+    const v = Number(e.target.value);
+    setProgress(v);
+    const audio = document.querySelector('audio');
+    if (audio) audio.currentTime = v;
+  };
+
   const rem = duration - progress;
   const RepIcon = repeat === 'one' ? Repeat1 : Repeat;
 
@@ -71,9 +77,9 @@ function FullscreenView({ onClose }) {
 
       <div className="flex-1 flex items-center justify-center">
         {currentTrack?.thumbnail ? (
-          <img src={currentTrack.thumbnail} className="w-[340px] h-[340px] rounded-lg shadow-2xl object-cover" alt="" />
+          <img src={currentTrack.thumbnail} className="w-[320px] h-[320px] rounded-lg shadow-2xl object-cover" alt="" />
         ) : (
-          <div className="w-[340px] h-[340px] bg-spotify-lighter rounded-lg flex items-center justify-center text-spotify-text text-8xl">♫</div>
+          <div className="w-[320px] h-[320px] bg-spotify-lighter rounded-lg flex items-center justify-center text-spotify-text text-8xl">♫</div>
         )}
       </div>
 
@@ -90,8 +96,8 @@ function FullscreenView({ onClose }) {
 
         <div className="w-full flex items-center gap-3">
           <span className="text-xs text-spotify-text w-10 text-right tabular-nums">{fmt(progress)}</span>
-          <input type="range" min="0" max={duration || 0} value={progress}
-            onChange={(e) => setProgress(Number(e.target.value))} className="flex-1 h-1 cursor-pointer" />
+          <input type="range" min="0" max={duration || 0} value={progress} onChange={seek}
+            className="flex-1 h-1 player-slider" />
           <span className="text-xs text-spotify-text w-10 tabular-nums">-{fmt(rem > 0 ? rem : 0)}</span>
         </div>
 
