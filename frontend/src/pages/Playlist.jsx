@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Music, Trash2 } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Music, Trash2, ArrowLeft } from 'lucide-react';
 import db from '../lib/db';
 import TrackList from '../components/TrackList';
 
 export default function Playlist() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [playlist, setPlaylist] = useState(null);
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +66,11 @@ export default function Playlist() {
 
   return (
     <div className="p-4 sm:p-6 pb-28">
-      <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-6 mb-6 animate-fadeUp">
+      <div className="flex items-center gap-4 mb-6 animate-fadeUp">
+        <button onClick={() => navigate(-1)}
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1a1a1a] hover:bg-[#242424] transition-colors shrink-0">
+          <ArrowLeft size={18} className="text-white" />
+        </button>
         <div className="w-32 h-32 sm:w-48 sm:h-48 bg-[#1a1a1a] rounded-xl flex items-center justify-center shadow-2xl shrink-0">
           <Music size={48} className="text-[var(--text-dim)]" />
         </div>

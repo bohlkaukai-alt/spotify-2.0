@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
-import { Mail, Lock, Loader2, LogIn, UserPlus, LogOut, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Mail, Lock, Loader2, LogIn, UserPlus, LogOut, Cloud, RefreshCw, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function AuthPage() {
@@ -61,8 +61,16 @@ export default function AuthPage() {
   if (user) {
     return (
       <div className="p-4 sm:p-6 pb-28 max-w-md mx-auto">
-        <div className="animate-fadeUp">
-          {toast && (
+      <div className="animate-fadeUp">
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => navigate(-1)}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1a1a1a] hover:bg-[#242424] transition-colors shrink-0">
+            <ArrowLeft size={18} className="text-white" />
+          </button>
+          <h1 className="text-xl font-bold">Konto</h1>
+        </div>
+
+        {toast && (
             <div className="mb-4 bg-[var(--green)] text-black px-5 py-3 rounded-xl text-sm font-semibold text-center animate-fadeUp shadow-lg">
               {toast}
             </div>
@@ -115,12 +123,18 @@ export default function AuthPage() {
   return (
     <div className="p-4 sm:p-6 pb-28 max-w-md mx-auto">
       <div className="animate-fadeUp">
-        <div className="text-center mb-8 pt-8">
-          <div className="w-16 h-16 rounded-2xl bg-[var(--green)] flex items-center justify-center mx-auto mb-4">
-            <Cloud size={28} className="text-black" />
+        <div className="flex items-center gap-3 mb-8 pt-8">
+          <button onClick={() => navigate(-1)}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1a1a1a] hover:bg-[#242424] transition-colors shrink-0">
+            <ArrowLeft size={18} className="text-white" />
+          </button>
+          <div className="flex-1 text-center pr-9">
+            <div className="w-14 h-14 rounded-2xl bg-[var(--green)] flex items-center justify-center mx-auto mb-3">
+              <Cloud size={28} className="text-black" />
+            </div>
+            <h1 className="text-2xl font-bold mb-1">Geräteübergreifend syncen</h1>
+            <p className="text-sm text-[var(--text-dim)]">Favoriten & Playlists auf allen Geräten</p>
           </div>
-          <h1 className="text-2xl font-bold mb-2">Geräteübergreifend syncen</h1>
-          <p className="text-sm text-[var(--text-dim)]">Favoriten & Playlists auf allen Geräten</p>
         </div>
 
         {error && (
