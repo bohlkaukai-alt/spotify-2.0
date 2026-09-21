@@ -20,6 +20,19 @@ export async function getArtistSongs(channelId, limit = 100) {
   return r.json();
 }
 
-export function getStreamUrl(id) {
-  return `${BASE}?action=stream&id=${id}`;
+export async function getStreamUrl(id) {
+  const r = await fetch(`${BASE}?action=stream&id=${id}`);
+  const data = await r.json();
+  return data.url;
+}
+
+export async function downloadTrack(track) {
+  const url = await getStreamUrl(track.id);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${track.artist} - ${track.title}.mp3`.replace(/[\/\\:]/g, '_');
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }

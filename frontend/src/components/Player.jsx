@@ -14,11 +14,21 @@ export default function Player({ onFullscreen }) {
   useEffect(() => {
     if (!currentTrack || !audio.current) return;
     const el = audio.current;
-      el.src = getStreamUrl(currentTrack.id);
-    el.load();
-    const onReady = () => { el.play().catch(() => {}); };
-    el.addEventListener('loadeddata', onReady, { once: true });
-    return () => el.removeEventListener('loadeddata', onReady);
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(getStreamUrl(currentTrack.id));
+        const data = await res.json();
+        if (cancelled) return;
+        el.src = data.url;
+        el.load();
+        const onReady = () => { el.play().catch(() => {}); };
+        el.addEventListener('loadeddata', onReady, { once: true });
+        return () => el.removeEventListener('loadeddata', onReady);
+      } catch {}
+    };
+    load();
+    return () => { cancelled = true; };
   }, [currentTrack?.id]);
 
   useEffect(() => {
