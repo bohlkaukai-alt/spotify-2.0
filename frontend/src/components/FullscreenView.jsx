@@ -111,7 +111,7 @@ export default function FullscreenView({ onClose }) {
       </div>
 
       {/* Album Art */}
-      <div className="flex-1 flex items-center justify-center px-12 min-h-0">
+      <div className="flex-[0.6] flex items-end justify-center px-12 pb-4 min-h-0">
         <img src={currentTrack.thumbnail} alt=""
           className="w-full max-w-[300px] aspect-square rounded-2xl object-cover shadow-2xl animate-fadeUp" />
       </div>
@@ -145,7 +145,7 @@ export default function FullscreenView({ onClose }) {
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-between px-8 safe-bottom shrink-0 animate-fadeUp" style={{ animationDelay: '0.15s' }}>
+      <div className="flex items-center justify-between px-8 pb-6 pt-2 shrink-0 animate-fadeUp" style={{ animationDelay: '0.15s' }}>
         <button onClick={setShuffle}
           className={`p-2 active:scale-90 transition-all ${shuffle ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'}`}>
           <Shuffle size={20} />
