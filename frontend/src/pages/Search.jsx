@@ -28,7 +28,7 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [history, setHistory] = useState([]);
-  const [showHistory, setShowHistory] = useState(false);
+  const [focused, setFocused] = useState(false);
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -58,7 +58,7 @@ export default function Search() {
     const searchTerm = q || query;
     if (!searchTerm.trim()) return;
     setQuery(searchTerm);
-    setShowHistory(false);
+    setFocused(false);
     setLoading(true);
     setSearched(true);
     saveToHistory(searchTerm);
@@ -76,6 +76,14 @@ export default function Search() {
     setLoading(false);
   };
 
+  const resetSearch = () => {
+    setSearched(false);
+    setTracks([]);
+    setArtists([]);
+    setQuery('');
+    inputRef.current?.focus();
+  };
+
   return (
     <div className="p-4 sm:p-6 pb-28">
       {/* Search Bar */}
@@ -85,67 +93,92 @@ export default function Search() {
             <SearchIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
             <input ref={inputRef} type="text" value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => setShowHistory(true)}
-              onBlur={() => setTimeout(() => setShowHistory(false), 200)}
+              onFocus={() => { setFocused(true); }}
+              onBlur={() => setTimeout(() => setFocused(false), 200)}
               onKeyDown={(e) => e.key === 'Enter' && search()}
               placeholder="Songs, Künstler suchen..."
-              className="w-full bg-[#1a1a1a] rounded-full pl-12 pr-10 py-3 text-white
+              className="w-full bg-[#1a1a1a] rounded-full pl-12 pr-10 py-3.5 text-white
                          placeholder-[var(--text-dim)] outline-none text-sm
                          border border-transparent focus:border-[var(--green)] focus:bg-[#1f1f1f]
                          transition-all duration-300 search-glow" />
             {query && (
-              <button onClick={() => { setQuery(''); setSearched(false); }}
+              <button onClick={() => { setQuery(''); if (searched) resetSearch(); }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-white transition-colors">
                 <X size={16} />
               </button>
             )}
           </div>
           <button onClick={() => search()} disabled={loading}
-            className="px-6 py-3 bg-[var(--green)] rounded-full font-semibold text-black text-sm
+            className="px-6 py-3.5 bg-[var(--green)] rounded-full font-semibold text-black text-sm
                        hover:scale-105 active:scale-95 transition-all disabled:opacity-50 shadow-lg shadow-[#1ed760]/20">
             {loading ? <Loader2 className="animate-spin" size={18} /> : 'Suchen'}
           </button>
         </div>
-
-        {/* Search History Dropdown */}
-        {showHistory && history.length > 0 && !searched && (
-          <div className="absolute top-full left-0 right-16 mt-2 bg-[#1a1a1a] rounded-xl border border-[#282828] shadow-2xl z-50 py-2 animate-slideDown">
-            <div className="flex items-center justify-between px-4 py-2">
-              <span className="text-[11px] text-[var(--text-dim)] uppercase tracking-wider font-medium">Letzte Suchen</span>
-              <button onClick={clearHistory} className="text-[var(--text-dim)] hover:text-white text-[11px] transition-colors">
-                Löschen
-              </button>
-            </div>
-            {history.map((term) => (
-              <div key={term} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#242424] cursor-pointer group transition-colors"
-                onClick={() => { setQuery(term); search(term); }}>
-                <Clock size={14} className="text-[var(--text-dim)] shrink-0" />
-                <span className="text-sm text-white truncate flex-1">{term}</span>
-                <button onClick={(e) => { e.stopPropagation(); removeFromHistory(term); }}
-                  className="text-[var(--text-dim)] hover:text-white opacity-0 group-hover:opacity-100 transition-all">
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Categories - shown when not searched */}
+      {/* ===== NO SEARCH: History + Categories ===== */}
       {!searched && !loading && (
-        <>
-          <h2 className="text-xl font-bold mb-4 animate-fadeUp" style={{ animationDelay: '0.05s' }}>Alle durchstöbern</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 stagger">
-            {CATEGORIES.map((cat) => (
-              <div key={cat.label} onClick={() => search(cat.query)}
-                className="relative aspect-[1.4] rounded-xl overflow-hidden cursor-pointer card-hover group"
-                style={{ background: `linear-gradient(135deg, ${cat.color}, ${cat.color}dd)` }}>
-                <span className="absolute top-3 left-4 text-base font-bold z-10">{cat.label}</span>
-                <div className="absolute bottom-0 right-0 w-20 h-20 sm:w-28 sm:h-28 rounded-tl-xl bg-black/20 rotate-25 transform translate-x-3 translate-y-3" />
+        <div className="space-y-8">
+
+          {/* Search History - PROMINENT */}
+          {history.length > 0 && (
+            <div className="animate-fadeUp" style={{ animationDelay: '0.05s' }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Clock size={16} className="text-[var(--green)]" />
+                  <h2 className="text-base font-bold">Letzte Suchen</h2>
+                </div>
+                <button onClick={clearHistory}
+                  className="flex items-center gap-1.5 text-[var(--text-dim)] hover:text-white text-xs font-medium transition-colors px-2 py-1 rounded-lg hover:bg-[#1a1a1a]">
+                  <Trash2 size={12} />
+                  Alles löschen
+                </button>
               </div>
-            ))}
+              <div className="space-y-1">
+                {history.map((term, i) => (
+                  <div key={term}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#1a1a1a] cursor-pointer group transition-all duration-200 active:scale-[0.98]"
+                    style={{ animationDelay: `${i * 0.03}s` }}
+                    onClick={() => search(term)}>
+                    <div className="w-9 h-9 rounded-lg bg-[#1a1a1a] flex items-center justify-center shrink-0 group-hover:bg-[var(--green)] transition-colors duration-200">
+                      <Clock size={16} className="text-[var(--text-dim)] group-hover:text-black transition-colors duration-200" />
+                    </div>
+                    <span className="text-sm text-white flex-1 truncate">{term}</span>
+                    <button onClick={(e) => { e.stopPropagation(); removeFromHistory(term); }}
+                      className="text-[var(--text-dim)] hover:text-white opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-full hover:bg-[#282828]">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State: No history yet */}
+          {history.length === 0 && (
+            <div className="text-center py-12 animate-fadeUp">
+              <div className="w-16 h-16 rounded-full bg-[#1a1a1a] flex items-center justify-center mx-auto mb-4">
+                <SearchIcon size={24} className="text-[var(--text-dim)]" />
+              </div>
+              <p className="text-sm text-[var(--text-dim)]">Such nach deinen Lieblingssongs</p>
+            </div>
+          )}
+
+          {/* Categories */}
+          <div className="animate-fadeUp" style={{ animationDelay: '0.1s' }}>
+            <h2 className="text-base font-bold mb-3">Kategorien durchstöbern</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 stagger">
+              {CATEGORIES.map((cat) => (
+                <div key={cat.label} onClick={() => search(cat.query)}
+                  className="relative aspect-[1.4] rounded-xl overflow-hidden cursor-pointer card-hover group"
+                  style={{ background: `linear-gradient(135deg, ${cat.color}, ${cat.color}dd)` }}>
+                  <span className="absolute top-3 left-4 text-sm font-bold z-10">{cat.label}</span>
+                  <div className="absolute bottom-0 right-0 w-20 h-20 sm:w-28 sm:h-28 rounded-tl-xl bg-black/20 rotate-25 transform translate-x-3 translate-y-3" />
+                </div>
+              ))}
+            </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Loading */}
