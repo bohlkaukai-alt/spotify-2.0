@@ -41,52 +41,57 @@ export default function Playlist() {
     window.history.back();
   };
 
+  const removeTrack = async (track) => {
+    const existing = await db.playlistTracks.where({ playlistId: Number(id), trackId: track.id }).first();
+    if (existing) await db.playlistTracks.delete(existing.id);
+    setTracks((prev) => prev.filter((t) => t.id !== track.id));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-spotify-green border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[var(--green)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!playlist) {
     return (
-      <div className="text-center py-20 text-spotify-text">
+      <div className="text-center py-20 text-[var(--text-dim)]">
         <p>Playlist nicht gefunden</p>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-end gap-6 mb-6">
-        <div className="w-48 h-48 bg-spotify-lighter rounded flex items-center justify-center shadow-2xl">
-          <Music size={64} className="text-spotify-text" />
+    <div className="p-4 sm:p-6 pb-28">
+      <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-6 mb-6 animate-fadeUp">
+        <div className="w-32 h-32 sm:w-48 sm:h-48 bg-[#1a1a1a] rounded-xl flex items-center justify-center shadow-2xl shrink-0">
+          <Music size={48} className="text-[var(--text-dim)]" />
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase">Playlist</p>
-          <h1 className="text-5xl font-bold mt-2 mb-4">{playlist.name}</h1>
-          <p className="text-spotify-text">{tracks.length} Songs</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Playlist</p>
+          <h1 className="text-3xl sm:text-5xl font-bold mt-1 mb-2 sm:mb-4">{playlist.name}</h1>
+          <p className="text-sm text-[var(--text-dim)]">{tracks.length} Songs</p>
         </div>
       </div>
 
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-4 mb-6 animate-fadeUp" style={{ animationDelay: '0.05s' }}>
         <button
           onClick={deletePlaylist}
-          className="flex items-center gap-2 px-4 py-2 text-spotify-text hover:text-white
-                     border border-spotify-text hover:border-white rounded-full text-sm transition-colors"
-        >
+          className="flex items-center gap-2 px-4 py-2 text-[var(--text-dim)] hover:text-red-400
+                     border border-[#2a2a2a] hover:border-red-400/50 rounded-full text-sm transition-all">
           <Trash2 size={14} /> Löschen
         </button>
       </div>
 
       {tracks.length === 0 ? (
-        <div className="text-center py-20 text-spotify-text">
-          <p>Noch keine Songs in dieser Playlist</p>
-          <p className="text-sm mt-2">Füge Songs über die Suche hinzu</p>
+        <div className="text-center py-20 text-[var(--text-dim)] animate-fadeUp">
+          <p className="text-lg mb-1">Noch keine Songs</p>
+          <p className="text-sm">Füge Songs über die Suche hinzu</p>
         </div>
       ) : (
-        <TrackList tracks={tracks} />
+        <TrackList tracks={tracks} playlistId={Number(id)} onRemoveTrack={removeTrack} />
       )}
     </div>
   );

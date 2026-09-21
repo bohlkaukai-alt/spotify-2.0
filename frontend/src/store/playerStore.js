@@ -65,6 +65,12 @@ const usePlayerStore = create((set, get) => ({
   },
 
   addToQueue: (track) => set((s) => ({ queue: [...s.queue, track] })),
+  playNext: (track) => set((s) => {
+    const idx = s.queue.findIndex((t) => t.id === s.currentTrack?.id);
+    const newQueue = [...s.queue];
+    newQueue.splice(idx + 1, 0, track);
+    return { queue: newQueue };
+  }),
   setQueue: (tracks) => set({ queue: tracks }),
   clearQueue: () => set({ queue: [], currentTrack: null, isPlaying: false }),
 }));

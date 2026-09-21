@@ -1,16 +1,27 @@
-import { useState, useEffect } from 'react';
-import { Play, Clock, Heart, Download, Plus, Pause } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Play, Clock, Heart, Download, Plus, Pause, MoreHorizontal, ListPlus, Trash2, SkipForward } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import usePlayerStore from '../store/playerStore';
 import db from '../lib/db';
 
-export default function TrackList({ tracks, title }) {
+export default function TrackList({ tracks, title, playlistId, onRemoveTrack }) {
   const { currentTrack, isPlaying, setTrack, setQueue, togglePlay } = usePlayerStore();
   const navigate = useNavigate();
   const [favorites, setFavorites] = useState(new Set());
+  const [menuTrack, setMenuTrack] = useState(null);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  const menuRef = useRef(null);
 
   useEffect(() => { loadFavorites(); }, []);
   useEffect(() => { loadFavorites(); }, [tracks]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuTrack(null);
+    };
+    if (menuTrack) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuTrack]);
 
   const loadFavorites = async () => {
     const favs = await db.favorites.toArray();
@@ -39,10 +50,42 @@ export default function TrackList({ tracks, title }) {
     }
   };
 
+  const openMenu = (e, track) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuPos({ x: Math.min(rect.left, window.innerWidth - 220), y: rect.bottom + 4 });
+    setMenuTrack(menuTrack?.id === track.id ? null : track);
+  };
+
+  const playNext = (track) => {
+    usePlayerStore.getState().playNext(track);
+    setMenuTrack(null);
+  };
+
+  const removeFavorite = async (track) => {
+    const existing = await db.favorites.where('trackId').equals(track.id).first();
+    if (existing) await db.favorites.delete(existing.id);
+    setFavorites((prev) => { const n = new Set(prev); n.delete(track.id); return n; });
+    setMenuTrack(null);
+  };
+
+  const removeFromPlaylist = async (track) => {
+    if (onRemoveTrack) {
+      await onRemoveTrack(track);
+    } else if (playlistId) {
+      const existing = await db.playlistTracks.where({ playlistId, trackId: track.id }).first();
+      if (existing) await db.playlistTracks.delete(existing.id);
+    }
+    setMenuTrack(null);
+  };
+
   const fmt = (s) => {
     if (!s) return '—';
     return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
   };
+
+  const isFav = menuTrack ? favorites.has(menuTrack.id) : false;
+  const isInPlaylist = !!playlistId;
 
   return (
     <div className="px-4 sm:px-6 pb-28">
@@ -95,19 +138,61 @@ export default function TrackList({ tracks, title }) {
                   className={`transition-colors ${favorites.has(track.id) ? 'text-[var(--green)]' : 'text-[var(--text-dim)] hover:text-white'}`}>
                   <Heart size={14} fill={favorites.has(track.id) ? 'currentColor' : 'none'} />
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); usePlayerStore.getState().addToQueue(track); }}
-                  className="text-[var(--text-dim)] hover:text-white hidden sm:block transition-colors">
-                  <Plus size={14} />
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); }}
-                  className="text-[var(--text-dim)] hover:text-white hidden sm:block transition-colors">
-                  <Download size={14} />
+                <button onClick={(e) => openMenu(e, track)}
+                  className="text-[var(--text-dim)] hover:text-white transition-colors">
+                  <MoreHorizontal size={16} />
                 </button>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Context Menu */}
+      {menuTrack && (
+        <div ref={menuRef}
+          className="fixed z-[150] bg-[#1f1f1f] rounded-xl shadow-2xl border border-[#2a2a2a] py-2 w-56 animate-fadeIn"
+          style={{ left: menuPos.x, top: menuPos.y }}>
+          <div className="px-4 py-2 border-b border-[#2a2a2a]">
+            <p className="text-xs font-semibold text-white truncate">{menuTrack.title}</p>
+            <p className="text-[10px] text-[var(--text-dim)] truncate">{menuTrack.artist}</p>
+          </div>
+
+          <button onClick={() => playNext(menuTrack)}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
+            <SkipForward size={16} className="text-[var(--text-dim)]" />
+            Als nächstes abspielen
+          </button>
+
+          {isFav ? (
+            <button onClick={() => removeFavorite(menuTrack)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
+              <Trash2 size={16} className="text-red-400" />
+              Aus Favoriten entfernen
+            </button>
+          ) : (
+            <button onClick={() => { toggleFavorite(new Event('click'), menuTrack); setMenuTrack(null); }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
+              <Heart size={16} className="text-[var(--text-dim)]" />
+              Zu Favoriten hinzufügen
+            </button>
+          )}
+
+          {isInPlaylist && (
+            <button onClick={() => removeFromPlaylist(menuTrack)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
+              <Trash2 size={16} className="text-red-400" />
+              Aus Playlist entfernen
+            </button>
+          )}
+
+          <button onClick={() => { navigator.clipboard.writeText(menuTrack.title + ' ' + menuTrack.artist); setMenuTrack(null); }}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
+            <ListPlus size={16} className="text-[var(--text-dim)]" />
+            Song-Name kopieren
+          </button>
+        </div>
+      )}
     </div>
   );
 }
