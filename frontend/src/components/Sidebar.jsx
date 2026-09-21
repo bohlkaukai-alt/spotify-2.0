@@ -34,7 +34,7 @@ export default function Sidebar({ onNavigate }) {
 
   return (
     <div className="w-64 bg-[#0a0a0a] sm:bg-[#0d0d0d] flex flex-col h-full shrink-0 border-r border-[#141414]">
-      <div className="px-4 py-3 hidden sm:flex items-center justify-between">
+      <div className="px-4 py-3 flex items-center justify-between">
         <span className="text-xl font-bold tracking-tight text-white">♫ Spotify 2.0</span>
         <button onClick={() => handleClick('/auth')}
           className="w-8 h-8 rounded-full bg-[#1a1a1a] hover:bg-[var(--green)] flex items-center justify-center transition-all group"
