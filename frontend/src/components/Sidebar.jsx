@@ -1,12 +1,14 @@
-import { Home, Search, Library, Plus } from 'lucide-react';
+import { Home, Search, Library, Plus, User } from 'lucide-react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import db from '../lib/db';
+import { useAuth } from '../lib/auth';
 
 export default function Sidebar({ onNavigate }) {
   const [playlists, setPlaylists] = useState([]);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   useEffect(() => { loadPlaylists(); }, []);
 
@@ -47,6 +49,14 @@ export default function Sidebar({ onNavigate }) {
             </button>
           );
         })}
+        <button onClick={() => handleClick('/auth')}
+          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-left
+            ${location.pathname === '/auth' ? 'bg-[#1a1a1a] text-white' : 'text-[var(--text-dim)] hover:text-white hover:bg-[#141414]'}`}>
+          <div className="w-5 h-5 rounded-full bg-[var(--green)] flex items-center justify-center text-black text-[10px] font-bold">
+            {user ? user.email?.[0]?.toUpperCase() || '?' : <User size={12} />}
+          </div>
+          {user ? 'Konto' : 'Anmelden'}
+        </button>
       </nav>
 
       <div className="mt-6 flex flex-col flex-1 overflow-hidden">
