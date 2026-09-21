@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Search as SearchIcon, Loader2, User } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Search as SearchIcon, Loader2, User, X, Clock, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import TrackList from '../components/TrackList';
 import { searchSongs, searchArtists } from '../lib/api';
@@ -19,20 +19,49 @@ const CATEGORIES = [
   { label: 'Lofi', query: 'lofi hip hop beats', color: '#006450' },
 ];
 
+const HISTORY_KEY = 'spotify_search_history';
+
 export default function Search() {
   const [query, setQuery] = useState('');
   const [tracks, setTracks] = useState([]);
   const [artists, setArtists] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const inputRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const saved = localStorage.getItem(HISTORY_KEY);
+    if (saved) setHistory(JSON.parse(saved));
+  }, []);
+
+  const saveToHistory = (term) => {
+    const updated = [term, ...history.filter(h => h !== term)].slice(0, 15);
+    setHistory(updated);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem(HISTORY_KEY);
+  };
+
+  const removeFromHistory = (term) => {
+    const updated = history.filter(h => h !== term);
+    setHistory(updated);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  };
 
   const search = async (q) => {
     const searchTerm = q || query;
     if (!searchTerm.trim()) return;
     setQuery(searchTerm);
+    setShowHistory(false);
     setLoading(true);
     setSearched(true);
+    saveToHistory(searchTerm);
     try {
       const [tracksData, artistsData] = await Promise.all([
         searchSongs(searchTerm, 25),
@@ -48,62 +77,108 @@ export default function Search() {
   };
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-        <div className="flex-1 relative">
-          <SearchIcon size={18} className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-spotify-text" />
-          <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && search()}
-            placeholder="Songs, Künstler suchen..."
-            className="w-full bg-spotify-lighter rounded-full pl-10 sm:pl-12 pr-4 sm:pr-6 py-2.5 sm:py-3 text-white
-                       placeholder-spotify-text outline-none focus:ring-2 focus:ring-spotify-green text-sm sm:text-base" />
+    <div className="p-4 sm:p-6 pb-28">
+      {/* Search Bar */}
+      <div className="relative mb-6 animate-fadeUp">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 relative">
+            <SearchIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+            <input ref={inputRef} type="text" value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setShowHistory(true)}
+              onBlur={() => setTimeout(() => setShowHistory(false), 200)}
+              onKeyDown={(e) => e.key === 'Enter' && search()}
+              placeholder="Songs, Künstler suchen..."
+              className="w-full bg-[#1a1a1a] rounded-full pl-12 pr-10 py-3 text-white
+                         placeholder-[var(--text-dim)] outline-none text-sm
+                         border border-transparent focus:border-[var(--green)] focus:bg-[#1f1f1f]
+                         transition-all duration-300 search-glow" />
+            {query && (
+              <button onClick={() => { setQuery(''); setSearched(false); }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-white transition-colors">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <button onClick={() => search()} disabled={loading}
+            className="px-6 py-3 bg-[var(--green)] rounded-full font-semibold text-black text-sm
+                       hover:scale-105 active:scale-95 transition-all disabled:opacity-50 shadow-lg shadow-[#1ed760]/20">
+            {loading ? <Loader2 className="animate-spin" size={18} /> : 'Suchen'}
+          </button>
         </div>
-        <button onClick={() => search()} disabled={loading}
-          className="px-4 sm:px-8 py-2.5 sm:py-3 bg-spotify-green rounded-full font-semibold text-black hover:scale-105 disabled:opacity-50 text-sm sm:text-base">
-          {loading ? <Loader2 className="animate-spin" size={20} /> : 'Suchen'}
-        </button>
+
+        {/* Search History Dropdown */}
+        {showHistory && history.length > 0 && !searched && (
+          <div className="absolute top-full left-0 right-16 mt-2 bg-[#1a1a1a] rounded-xl border border-[#282828] shadow-2xl z-50 py-2 animate-slideDown">
+            <div className="flex items-center justify-between px-4 py-2">
+              <span className="text-[11px] text-[var(--text-dim)] uppercase tracking-wider font-medium">Letzte Suchen</span>
+              <button onClick={clearHistory} className="text-[var(--text-dim)] hover:text-white text-[11px] transition-colors">
+                Löschen
+              </button>
+            </div>
+            {history.map((term) => (
+              <div key={term} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#242424] cursor-pointer group transition-colors"
+                onClick={() => { setQuery(term); search(term); }}>
+                <Clock size={14} className="text-[var(--text-dim)] shrink-0" />
+                <span className="text-sm text-white truncate flex-1">{term}</span>
+                <button onClick={(e) => { e.stopPropagation(); removeFromHistory(term); }}
+                  className="text-[var(--text-dim)] hover:text-white opacity-0 group-hover:opacity-100 transition-all">
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* Categories - shown when not searched */}
       {!searched && !loading && (
         <>
-          <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Alle durchstöbern</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+          <h2 className="text-xl font-bold mb-4 animate-fadeUp" style={{ animationDelay: '0.05s' }}>Alle durchstöbern</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 stagger">
             {CATEGORIES.map((cat) => (
               <div key={cat.label} onClick={() => search(cat.query)}
-                className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
-                style={{ background: cat.color }}>
-                <span className="absolute top-3 left-3 sm:top-4 sm:left-4 text-base sm:text-xl font-bold">{cat.label}</span>
-                <div className="absolute bottom-0 right-0 w-16 h-16 sm:w-24 sm:h-24 bg-black/20 rotate-25 transform translate-x-2 translate-y-2 sm:translate-x-4 sm:translate-y-2 rounded" />
+                className="relative aspect-[1.4] rounded-xl overflow-hidden cursor-pointer card-hover group"
+                style={{ background: `linear-gradient(135deg, ${cat.color}, ${cat.color}dd)` }}>
+                <span className="absolute top-3 left-4 text-base font-bold z-10">{cat.label}</span>
+                <div className="absolute bottom-0 right-0 w-20 h-20 sm:w-28 sm:h-28 rounded-tl-xl bg-black/20 rotate-25 transform translate-x-3 translate-y-3" />
               </div>
             ))}
           </div>
         </>
       )}
 
+      {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-10 h-10 border-2 border-spotify-green border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center justify-center py-20 gap-4 animate-fadeIn">
+          <div className="w-10 h-10 border-2 border-[var(--green)] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-[var(--text-dim)]">Suche läuft...</p>
         </div>
       )}
 
+      {/* No Results */}
       {!loading && searched && tracks.length === 0 && artists.length === 0 && (
-        <div className="text-center py-20 text-spotify-text">
+        <div className="text-center py-20 animate-fadeUp">
           <p className="text-xl font-semibold mb-2">Keine Ergebnisse</p>
+          <p className="text-sm text-[var(--text-dim)]">Versuch einen anderen Suchbegriff</p>
         </div>
       )}
 
+      {/* Artists */}
       {!loading && artists.length > 0 && (
-        <div className="mb-6 sm:mb-8">
-          <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Künstler</h2>
-          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div className="mb-6 animate-fadeUp" style={{ animationDelay: '0.05s' }}>
+          <h2 className="text-xl font-bold mb-4">Künstler</h2>
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 stagger">
             {artists.map((artist) => (
               <div key={artist.id} onClick={() => navigate(`/artist/${artist.id}`)}
-                className="bg-spotify-lighter p-3 sm:p-4 rounded-lg cursor-pointer hover:bg-spotify-hover transition-colors group">
-                <div className="aspect-square rounded-full overflow-hidden mb-2 sm:mb-3 shadow-lg">
+                className="bg-[#141414] p-4 rounded-xl cursor-pointer card-hover group">
+                <div className="aspect-square rounded-full overflow-hidden mb-3 shadow-lg">
                   {artist.thumbnail ? (
-                    <img src={artist.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="" />
+                    <img src={artist.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
                   ) : (
-                    <div className="w-full h-full bg-spotify-dark flex items-center justify-center"><User size={32} className="text-spotify-text" /></div>
+                    <div className="w-full h-full bg-[#1a1a1a] flex items-center justify-center">
+                      <User size={32} className="text-[var(--text-dim)]" />
+                    </div>
                   )}
                 </div>
                 <p className="text-xs sm:text-sm font-medium truncate text-center">{artist.name}</p>
@@ -113,6 +188,7 @@ export default function Search() {
         </div>
       )}
 
+      {/* Tracks */}
       {!loading && tracks.length > 0 && <TrackList tracks={tracks} title="Songs" />}
     </div>
   );

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Play, Clock, Heart, Download, Plus } from 'lucide-react';
+import { Play, Clock, Heart, Download, Plus, Pause } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import usePlayerStore from '../store/playerStore';
 import db from '../lib/db';
-import { downloadTrack } from '../utils/download';
 
 export default function TrackList({ tracks, title }) {
-  const { setTrack, setQueue } = usePlayerStore();
+  const { currentTrack, isPlaying, setTrack, setQueue, togglePlay } = usePlayerStore();
   const navigate = useNavigate();
   const [favorites, setFavorites] = useState(new Set());
 
@@ -31,9 +30,13 @@ export default function TrackList({ tracks, title }) {
   };
 
   const handlePlay = (track) => {
-    setQueue(tracks);
-    setTrack(track);
-    if (window.__ytPlay) window.__ytPlay(track.id);
+    if (currentTrack?.id === track.id) {
+      togglePlay();
+    } else {
+      setQueue(tracks);
+      setTrack(track);
+      if (window.__ytPlay) window.__ytPlay(track.id);
+    }
   };
 
   const fmt = (s) => {
@@ -42,61 +45,69 @@ export default function TrackList({ tracks, title }) {
   };
 
   return (
-    <div className="px-4 sm:px-6 pb-24">
-      {title && <h2 className="text-2xl font-bold mb-4">{title}</h2>}
+    <div className="px-4 sm:px-6 pb-28">
+      {title && <h2 className="text-2xl font-bold mb-4 animate-fadeUp">{title}</h2>}
 
-      {/* Header - hidden on mobile */}
       <div className="hidden sm:grid grid-cols-[16px_4fr_3fr_minmax(100px,1fr)_minmax(80px,1fr)] gap-4 px-4 py-2
-                      text-spotify-text text-xs uppercase tracking-wider border-b border-[#282828] mb-2">
+                      text-[var(--text-dim)] text-[11px] uppercase tracking-wider border-b border-[#1f1f1f] mb-2 animate-fadeIn">
         <span>#</span><span>Title</span><span>Album</span>
         <span className="flex justify-end"><Clock size={14} /></span><span></span>
       </div>
 
-      {tracks.map((track, i) => (
-        <div key={track.id}
-          className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 rounded-md hover:bg-[#ffffff10]
-                     cursor-pointer group active:bg-[#ffffff20]"
-          onClick={() => handlePlay(track)}>
+      <div className="stagger">
+        {tracks.map((track, i) => {
+          const isCurrent = currentTrack?.id === track.id;
+          return (
+            <div key={track.id}
+              className={`track-row flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2.5 rounded-lg cursor-pointer group
+                ${isCurrent ? 'bg-[#1a1a1a]' : 'hover:bg-[#141414]'}`}
+              onClick={() => handlePlay(track)}>
 
-          {/* Number / Play icon */}
-          <span className="text-spotify-text text-sm w-6 text-center shrink-0 hidden sm:block group-hover:hidden">{i + 1}</span>
-          <button className="hidden sm:block group-hover:block text-white w-6 text-center shrink-0" onClick={(e) => e.stopPropagation()}>
-            <Play size={14} fill="white" className="mx-auto" />
-          </button>
+              <span className="text-[var(--text-dim)] text-sm w-6 text-center shrink-0 hidden sm:block group-hover:hidden tabular-nums">
+                {isCurrent && isPlaying ? (
+                  <span className="playing-indicator flex items-end justify-center h-4">
+                    <span /><span /><span /><span />
+                  </span>
+                ) : i + 1}
+              </span>
+              <button className="hidden sm:block group-hover:block text-white w-6 text-center shrink-0" onClick={(e) => { e.stopPropagation(); handlePlay(track); }}>
+                {isCurrent && isPlaying
+                  ? <Pause size={14} fill="white" className="mx-auto" />
+                  : <Play size={14} fill="white" className="mx-auto" />}
+              </button>
 
-          {/* Thumbnail + Info */}
-          <img src={track.thumbnail} className="w-10 h-10 rounded shrink-0" alt="" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">{track.title}</p>
-            <p className="text-xs text-spotify-text truncate"
-              onClick={(e) => { e.stopPropagation(); if (track.artistId) navigate(`/artist/${track.artistId}`); }}>
-              {track.artist}
-            </p>
-          </div>
+              <img src={track.thumbnail}
+                className={`w-10 h-10 rounded-lg object-cover shrink-0 transition-shadow ${isCurrent ? 'shadow-lg shadow-black/40' : ''}`} alt="" />
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-medium truncate ${isCurrent ? 'text-[var(--green)]' : 'text-white'}`}>{track.title}</p>
+                <p className="text-xs text-[var(--text-dim)] truncate"
+                  onClick={(e) => { e.stopPropagation(); if (track.artistId) navigate(`/artist/${track.artistId}`); }}>
+                  {track.artist}
+                </p>
+              </div>
 
-          {/* Album - hidden on mobile */}
-          <span className="text-sm text-spotify-text truncate hidden md:block flex-1">{track.album || '—'}</span>
+              <span className="text-sm text-[var(--text-dim)] truncate hidden md:block flex-1">{track.album || '—'}</span>
 
-          {/* Duration */}
-          <span className="text-sm text-spotify-text tabular-nums shrink-0">{fmt(track.duration)}</span>
+              <span className="text-sm text-[var(--text-dim)] tabular-nums shrink-0">{fmt(track.duration)}</span>
 
-          {/* Actions - visible on hover / always on mobile */}
-          <div className="flex items-center gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-            <button onClick={(e) => toggleFavorite(e, track)}
-              className={favorites.has(track.id) ? 'text-spotify-green' : 'text-spotify-text hover:text-white'}>
-              <Heart size={14} fill={favorites.has(track.id) ? 'currentColor' : 'none'} />
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); usePlayerStore.getState().addToQueue(track); }}
-              className="text-spotify-text hover:text-white hidden sm:block">
-              <Plus size={14} />
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); downloadTrack(track); }}
-              className="text-spotify-text hover:text-white hidden sm:block">
-              <Download size={14} />
-            </button>
-          </div>
-        </div>
-      ))}
+              <div className="flex items-center gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
+                <button onClick={(e) => toggleFavorite(e, track)}
+                  className={`transition-colors ${favorites.has(track.id) ? 'text-[var(--green)]' : 'text-[var(--text-dim)] hover:text-white'}`}>
+                  <Heart size={14} fill={favorites.has(track.id) ? 'currentColor' : 'none'} />
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); usePlayerStore.getState().addToQueue(track); }}
+                  className="text-[var(--text-dim)] hover:text-white hidden sm:block transition-colors">
+                  <Plus size={14} />
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); }}
+                  className="text-[var(--text-dim)] hover:text-white hidden sm:block transition-colors">
+                  <Download size={14} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

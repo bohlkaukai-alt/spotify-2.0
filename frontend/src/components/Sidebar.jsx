@@ -1,11 +1,12 @@
 import { Home, Search, Library, Plus } from 'lucide-react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import db from '../lib/db';
 
 export default function Sidebar({ onNavigate }) {
   const [playlists, setPlaylists] = useState([]);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => { loadPlaylists(); }, []);
 
@@ -30,36 +31,46 @@ export default function Sidebar({ onNavigate }) {
   };
 
   return (
-    <div className="w-64 bg-spotify-black flex flex-col p-2 gap-2 h-full shrink-0">
+    <div className="w-64 bg-[#0a0a0a] sm:bg-[#0d0d0d] flex flex-col p-2 gap-1 h-full shrink-0 border-r border-[#141414]">
       <div className="px-4 py-3 hidden sm:block">
         <span className="text-xl font-bold tracking-tight text-white">♫ Spotify 2.0</span>
       </div>
 
-      <nav className="flex flex-col gap-1">
-        {navItems.map(({ to, icon: Icon, label }) => (
-          <button key={to} onClick={() => handleClick(to)}
-            className={`flex items-center gap-3 px-4 py-2 rounded-md text-sm font-medium transition-colors text-left
-              ${location.pathname === to ? 'bg-spotify-lighter text-white' : 'text-spotify-text hover:text-white'}`}>
-            <Icon size={22} />{label}
-          </button>
-        ))}
+      <nav className="flex flex-col gap-0.5">
+        {navItems.map(({ to, icon: Icon, label }) => {
+          const active = location.pathname === to;
+          return (
+            <button key={to} onClick={() => handleClick(to)}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-left
+                ${active ? 'bg-[#1a1a1a] text-white' : 'text-[var(--text-dim)] hover:text-white hover:bg-[#141414]'}`}>
+              <Icon size={20} strokeWidth={active ? 2.5 : 2} />{label}
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="mt-4 flex flex-col flex-1 overflow-hidden">
-        <div className="flex items-center justify-between px-4 mb-2">
-          <span className="text-spotify-text text-xs font-semibold uppercase tracking-wider">Playlists</span>
-          <button onClick={createPlaylist} className="text-spotify-text hover:text-white"><Plus size={18} /></button>
+      <div className="mt-6 flex flex-col flex-1 overflow-hidden">
+        <div className="flex items-center justify-between px-4 mb-3">
+          <span className="text-[var(--text-dim)] text-[11px] font-semibold uppercase tracking-wider">Playlists</span>
+          <button onClick={createPlaylist}
+            className="w-7 h-7 flex items-center justify-center text-[var(--text-dim)] hover:text-white hover:bg-[#1a1a1a] rounded-md transition-all">
+            <Plus size={16} />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-2">
+        <div className="flex-1 overflow-y-auto px-1">
           {playlists.length === 0 ? (
-            <p className="text-spotify-text text-sm px-2">Noch keine Playlists</p>
+            <p className="text-[var(--text-dim)] text-xs px-3 py-2">Noch keine Playlists</p>
           ) : (
-            playlists.map((pl) => (
-              <button key={pl.id} onClick={() => handleClick(`/playlist/${pl.id}`)}
-                className="w-full text-left px-2 py-1.5 text-sm text-spotify-text hover:text-white rounded truncate">
-                {pl.name}
-              </button>
-            ))
+            playlists.map((pl) => {
+              const active = location.pathname === `/playlist/${pl.id}`;
+              return (
+                <button key={pl.id} onClick={() => handleClick(`/playlist/${pl.id}`)}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate transition-all duration-200
+                    ${active ? 'bg-[#1a1a1a] text-white' : 'text-[var(--text-dim)] hover:text-white hover:bg-[#141414]'}`}>
+                  {pl.name}
+                </button>
+              );
+            })
           )}
         </div>
       </div>
