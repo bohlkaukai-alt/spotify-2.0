@@ -40,7 +40,6 @@ export default function Search() {
       if (tracksRes.ok) setTracks(await tracksRes.json());
       if (artistsRes.ok) setArtists(await artistsRes.json());
     } catch (err) {
-      console.error('Suche fehlgeschlagen:', err);
       setTracks([]);
       setArtists([]);
     }
@@ -48,81 +47,71 @@ export default function Search() {
   };
 
   return (
-    <div className="p-6">
-      {/* Search Bar */}
-      <div className="flex items-center gap-3 mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
         <div className="flex-1 relative">
-          <SearchIcon size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-spotify-text" />
+          <SearchIcon size={18} className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-spotify-text" />
           <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && search()}
-            placeholder="Songs, Künstler, Alben suchen..."
-            className="w-full bg-spotify-lighter rounded-full pl-12 pr-6 py-3 text-white
-                       placeholder-spotify-text outline-none focus:ring-2 focus:ring-spotify-green text-base transition-shadow" />
+            placeholder="Songs, Künstler suchen..."
+            className="w-full bg-spotify-lighter rounded-full pl-10 sm:pl-12 pr-4 sm:pr-6 py-2.5 sm:py-3 text-white
+                       placeholder-spotify-text outline-none focus:ring-2 focus:ring-spotify-green text-sm sm:text-base" />
         </div>
         <button onClick={() => search()} disabled={loading}
-          className="px-8 py-3 bg-spotify-green rounded-full font-semibold text-black hover:scale-105 transition-transform disabled:opacity-50">
+          className="px-4 sm:px-8 py-2.5 sm:py-3 bg-spotify-green rounded-full font-semibold text-black hover:scale-105 disabled:opacity-50 text-sm sm:text-base">
           {loading ? <Loader2 className="animate-spin" size={20} /> : 'Suchen'}
         </button>
       </div>
 
-      {/* Categories - shown when not searched */}
       {!searched && !loading && (
         <>
-          <h2 className="text-2xl font-bold mb-4">Alle durchstöbern</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Alle durchstöbern</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {CATEGORIES.map((cat) => (
               <div key={cat.label} onClick={() => search(cat.query)}
                 className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
                 style={{ background: cat.color }}>
-                <span className="absolute top-4 left-4 text-xl font-bold">{cat.label}</span>
-                <div className="absolute bottom-0 right-0 w-24 h-24 bg-black/20 rotate-25 transform translate-x-4 translate-y-2 rounded" />
+                <span className="absolute top-3 left-3 sm:top-4 sm:left-4 text-base sm:text-xl font-bold">{cat.label}</span>
+                <div className="absolute bottom-0 right-0 w-16 h-16 sm:w-24 sm:h-24 bg-black/20 rotate-25 transform translate-x-2 translate-y-2 sm:translate-x-4 sm:translate-y-2 rounded" />
               </div>
             ))}
           </div>
         </>
       )}
 
-      {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-20">
           <div className="w-10 h-10 border-2 border-spotify-green border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {/* No results */}
       {!loading && searched && tracks.length === 0 && artists.length === 0 && (
         <div className="text-center py-20 text-spotify-text">
           <p className="text-xl font-semibold mb-2">Keine Ergebnisse</p>
-          <p>Probiere einen anderen Suchbegriff</p>
         </div>
       )}
 
-      {/* Artists */}
       {!loading && artists.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Künstler</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="mb-6 sm:mb-8">
+          <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Künstler</h2>
+          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
             {artists.map((artist) => (
               <div key={artist.id} onClick={() => navigate(`/artist/${artist.id}`)}
-                className="bg-spotify-lighter p-4 rounded-lg cursor-pointer hover:bg-spotify-hover transition-colors group">
-                <div className="aspect-square rounded-full overflow-hidden mb-3 shadow-lg">
+                className="bg-spotify-lighter p-3 sm:p-4 rounded-lg cursor-pointer hover:bg-spotify-hover transition-colors group">
+                <div className="aspect-square rounded-full overflow-hidden mb-2 sm:mb-3 shadow-lg">
                   {artist.thumbnail ? (
                     <img src={artist.thumbnail} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="" />
                   ) : (
-                    <div className="w-full h-full bg-spotify-dark flex items-center justify-center">
-                      <User size={48} className="text-spotify-text" />
-                    </div>
+                    <div className="w-full h-full bg-spotify-dark flex items-center justify-center"><User size={32} className="text-spotify-text" /></div>
                   )}
                 </div>
-                <p className="text-sm font-medium truncate text-center">{artist.name}</p>
-                <p className="text-xs text-spotify-text text-center">Künstler</p>
+                <p className="text-xs sm:text-sm font-medium truncate text-center">{artist.name}</p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Tracks */}
       {!loading && tracks.length > 0 && <TrackList tracks={tracks} title="Songs" />}
     </div>
   );
