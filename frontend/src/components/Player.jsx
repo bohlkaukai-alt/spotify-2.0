@@ -1,24 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Volume, Volume1, Volume2, Maximize2 } from 'lucide-react';
 import usePlayerStore from '../store/playerStore';
-import { getStreamUrl } from '../lib/api';
 
 export default function Player() {
-  const { currentTrack, queue, isPlaying, volume, repeat, shuffle,
+  const { currentTrack, isPlaying, volume, repeat, shuffle,
     togglePlay, nextTrack, prevTrack, setRepeat, setShuffle, setVolume } = usePlayerStore();
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const audio = useRef(null);
   const playerRef = useRef(null);
   const ytPlayer = useRef(null);
-  const [useYT, setUseYT] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (window.YT && window.YT.Player) {
-      setReady(true);
-      return;
-    }
+    if (window.YT && window.YT.Player) { setReady(true); return; }
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
     document.head.appendChild(tag);
@@ -28,32 +22,27 @@ export default function Player() {
   useEffect(() => {
     if (!ready || !playerRef.current || ytPlayer.current) return;
     ytPlayer.current = new window.YT.Player(playerRef.current, {
-      height: '0', width: '0',
-      playerVars: { autoplay: 0, controls: 0, disablekb: 1, modestbranding: 1, rel: 0 },
+      height: '1', width: '1',
+      playerVars: { autoplay: 0, controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1 },
       events: {
-        onReady: () => {},
         onStateChange: (e) => {
           if (e.data === window.YT.PlayerState.ENDED) {
-            const state = usePlayerStore.getState();
-            if (state.repeat === 'one') {
-              ytPlayer.current.seekTo(0, true);
-              ytPlayer.current.playVideo();
-            } else {
-              state.nextTrack();
-            }
-          } else if (e.data === window.YT.PlayerState.PLAYING) {
-            setDuration(ytPlayer.current.getDuration());
+            const st = usePlayerStore.getState();
+            if (st.repeat === 'one') { ytPlayer.current.seekTo(0, true); ytPlayer.current.playVideo(); }
+            else st.nextTrack();
           }
         },
       },
     });
   }, [ready]);
 
-  useEffect(() => {
-    if (!ytPlayer.current || !currentTrack) return;
-    ytPlayer.current.loadVideoById(currentTrack.id);
-    if (!isPlaying) ytPlayer.current.pauseVideo();
-  }, [currentTrack?.id]);
+  const ytPlay = useCallback((videoId) => {
+    if (!ytPlayer.current) return;
+    ytPlayer.current.loadVideoById({ videoId, suggestedQuality: 'small' });
+    setProgress(0);
+  }, []);
+
+  useEffect(() => { window.__ytPlay = ytPlay; }, [ytPlay]);
 
   useEffect(() => {
     if (!ytPlayer.current) return;
@@ -61,27 +50,14 @@ export default function Player() {
     else ytPlayer.current.pauseVideo();
   }, [isPlaying]);
 
-  useEffect(() => {
-    if (!ytPlayer.current) return;
-    ytPlayer.current.setVolume(volume * 100);
-  }, [volume]);
+  useEffect(() => { if (ytPlayer.current) ytPlayer.current.setVolume(volume * 100); }, [volume]);
 
   useEffect(() => {
     if (!ytPlayer.current || !isPlaying) return;
     const iv = setInterval(() => {
-      if (ytPlayer.current && ytPlayer.current.getCurrentTime) {
+      if (ytPlayer.current?.getCurrentTime) {
         setProgress(ytPlayer.current.getCurrentTime());
         setDuration(ytPlayer.current.getDuration());
-      }
-    }, 500);
-    return () => clearInterval(iv);
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (!ytPlayer.current || !isPlaying) return;
-    const iv = setInterval(() => {
-      if (ytPlayer.current && ytPlayer.current.getCurrentTime) {
-        setProgress(ytPlayer.current.getCurrentTime());
       }
     }, 500);
     return () => clearInterval(iv);
@@ -118,12 +94,7 @@ export default function Player() {
 
   return (
     <>
-      <div ref={playerRef} id="ytplayer" style={{ display: 'none' }} />
-      <audio ref={audio}
-        onTimeUpdate={(e) => setProgress(e.target.currentTime)}
-        onLoadedMetadata={(e) => setDuration(e.target.duration)}
-        onError={(e) => console.error('Audio error:', e.target.error)}
-      />
+      <div ref={playerRef} style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }} />
       <div className="h-[64px] sm:h-[72px] bg-spotify-black border-t border-[#282828] flex flex-col sm:flex-row items-center px-2 sm:px-4 z-50 shrink-0">
         {currentTrack ? (
           <>

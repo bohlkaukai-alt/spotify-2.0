@@ -33,6 +33,7 @@ export default function TrackList({ tracks, title }) {
   const handlePlay = (track) => {
     setQueue(tracks);
     setTrack(track);
+    if (window.__ytPlay) window.__ytPlay(track.id);
   };
 
   const fmt = (s) => {

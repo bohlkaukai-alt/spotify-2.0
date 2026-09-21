@@ -31,7 +31,7 @@ export default function Artist() {
   };
 
   const playAll = () => {
-    if (songs.length) { setQueue(songs); setTrack(songs[0]); }
+    if (songs.length) { setQueue(songs); setTrack(songs[0]); if (window.__ytPlay) window.__ytPlay(songs[0].id); }
   };
 
   if (loading) {

@@ -23,7 +23,7 @@ export default function Home() {
     setLoading(false);
   };
 
-  const playTrack = (track) => { setQueue(recentTracks); setTrack(track); };
+  const playTrack = (track) => { setQueue(recentTracks); setTrack(track); if (window.__ytPlay) window.__ytPlay(track.id); };
 
   const getGreeting = () => {
     const h = new Date().getHours();
