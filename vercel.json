@@ -2,9 +2,9 @@
   "version": 2,
   "installCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "rewrites": [
-    { "source": "/api", "destination": "/api/index.js" },
-    { "source": "/api/:path*", "destination": "/api/index.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
+    { "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map|json|webmanifest))$", "dest": "/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
