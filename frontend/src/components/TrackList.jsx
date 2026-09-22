@@ -46,7 +46,6 @@ export default function TrackList({ tracks, title, playlistId, onRemoveTrack }) 
     } else {
       setQueue(tracks);
       setTrack(track);
-      if (window.__ytPlay) window.__ytPlay(track.id);
     }
   };
 
