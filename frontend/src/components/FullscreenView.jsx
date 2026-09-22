@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart, ListPlus, Play, Pause, SkipBack, SkipForward, ChevronDown, Repeat, Repeat1, Shuffle } from 'lucide-react';
+import { Heart, ListPlus, Play, Pause, SkipBack, SkipForward, ChevronDown, Repeat, Repeat1, Shuffle, Share2, Maximize2 } from 'lucide-react';
 import usePlayerStore from '../store/playerStore';
 import db from '../lib/db';
 
@@ -61,46 +61,46 @@ export default function FullscreenView({ onClose }) {
     setProgress(newTime);
   };
 
-  const fmt = (s) => {
-    if (!s || isNaN(s)) return '0:00';
-    return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
-  };
-
+  const fmt = (s) => { if (!s || isNaN(s)) return '0:00'; return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`; };
   const RepeatIcon = repeat === 'one' ? Repeat1 : Repeat;
   const repeatLabel = repeat === 'all' ? 'Playlist' : repeat === 'one' ? '1 Song' : 'Aus';
 
   if (!currentTrack) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col animate-slideUp"
-      style={{ backgroundColor: '#0a0a0a' }}>
+    <div className="fixed inset-0 z-[200] flex flex-col bg-gradient-to-b from-[#333] via-[#1a1a1a] to-[#121212] md:from-[#181818] md:via-[#121212] md:to-[#121212]">
 
       {toast && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-[var(--green)] text-black px-5 py-2 rounded-full text-sm font-semibold z-50 shadow-lg animate-fadeUp">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-white text-black px-5 py-2.5 rounded-full text-sm font-bold z-50 shadow-lg animate-fadeUp">
           {toast}
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between px-5 safe-top shrink-0">
-        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-transform">
-          <ChevronDown size={28} />
+      <div className="flex items-center justify-between px-4 py-3 shrink-0">
+        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center active:scale-90 transition-transform">
+          <ChevronDown size={28} className="text-white" />
         </button>
-        <span className="text-[11px] text-[var(--text-dim)] uppercase tracking-[0.2em] font-medium">Jetzt abgespielt</span>
+        <div className="text-center">
+          <p className="text-[10px] text-white/60 uppercase tracking-widest font-medium">Wird abgespielt aus</p>
+          <p className="text-xs font-bold text-white">Deine Bibliothek</p>
+        </div>
         <div className="relative">
           <button onClick={() => setShowPlaylistMenu(!showPlaylistMenu)}
-            className="w-10 h-10 flex items-center justify-center text-white active:scale-90 transition-transform">
-            <ListPlus size={22} />
+            className="w-10 h-10 flex items-center justify-center active:scale-90 transition-transform">
+            <svg viewBox="0 0 16 16" fill="white" width="20" height="20">
+              <path d="M3 8a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM16 8a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+            </svg>
           </button>
           {showPlaylistMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowPlaylistMenu(false)} />
-              <div className="absolute top-full right-0 mt-2 bg-[#1f1f1f] rounded-xl shadow-2xl z-50 w-56 py-2 border border-[#2a2a2a] animate-fadeUp">
-                <p className="px-4 py-2 text-[10px] text-[var(--text-dim)] uppercase tracking-wider font-medium">Zur Playlist</p>
+              <div className="absolute top-full right-0 mt-2 bg-[#282828] rounded-xl shadow-2xl z-50 w-64 py-2 animate-fadeUp">
+                <p className="px-4 py-2 text-xs text-[var(--text-dim)] uppercase tracking-wider font-medium">Zur Playlist</p>
                 {playlists.length === 0 && <p className="px-4 py-2 text-sm text-[var(--text-dim)]">Keine Playlists</p>}
                 {playlists.map(pl => (
                   <button key={pl.id} onClick={() => addToPlaylist(pl.id)}
-                    className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors truncate">
+                    className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-[#3e3e3e] transition-colors truncate">
                     {pl.name}
                   </button>
                 ))}
@@ -111,28 +111,26 @@ export default function FullscreenView({ onClose }) {
       </div>
 
       {/* Album Art */}
-      <div className="flex-[0.6] flex items-end justify-center px-12 pb-4 min-h-0">
+      <div className="flex-[1] flex items-center justify-center px-8 md:px-16 min-h-0">
         <img src={currentTrack.thumbnail} alt=""
-          className="w-full max-w-[300px] aspect-square rounded-2xl object-cover shadow-2xl animate-fadeUp" />
+          className="w-full max-w-[340px] aspect-square rounded-lg object-cover shadow-2xl" />
       </div>
 
-      {/* Track Info + Like */}
-      <div className="px-6 mb-4 shrink-0 animate-fadeUp" style={{ animationDelay: '0.05s' }}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-bold text-white truncate leading-tight">{currentTrack.title}</h2>
-            <p className="text-sm text-[var(--text-dim)] truncate mt-0.5">{currentTrack.artist}</p>
-          </div>
-          <button onClick={toggleLike} className="shrink-0 p-2 active:scale-90 transition-transform">
-            <Heart size={24} className={liked ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'}
-              fill={liked ? 'currentColor' : 'none'} />
-          </button>
+      {/* Track Info */}
+      <div className="px-6 pt-5 pb-2 shrink-0 flex items-end justify-between">
+        <div className="min-w-0 flex-1 mr-4">
+          <h2 className="text-xl font-bold text-white truncate">{currentTrack.title}</h2>
+          <p className="text-sm text-[var(--text-dim)] truncate mt-0.5">{currentTrack.artist}</p>
         </div>
+        <button onClick={toggleLike} className="shrink-0 p-1 active:scale-90 transition-transform">
+          <Heart size={22} className={liked ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'}
+            fill={liked ? 'currentColor' : 'none'} />
+        </button>
       </div>
 
       {/* Progress */}
-      <div className="px-6 mb-3 shrink-0 animate-fadeUp" style={{ animationDelay: '0.1s' }}>
-        <div className="w-full h-1.5 bg-[#2a2a2a] rounded-full cursor-pointer group" onClick={seek}>
+      <div className="px-6 py-2 shrink-0">
+        <div className="w-full h-1.5 bg-[#4d4d4d] rounded-full cursor-pointer group" onClick={seek}>
           <div className="h-full bg-white group-hover:bg-[var(--green)] rounded-full relative transition-all"
             style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }}>
             <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -145,24 +143,24 @@ export default function FullscreenView({ onClose }) {
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-between px-8 pb-6 pt-2 shrink-0 animate-fadeUp" style={{ animationDelay: '0.15s' }}>
+      <div className="flex items-center justify-between px-6 pb-8 pt-1 shrink-0">
         <button onClick={setShuffle}
           className={`p-2 active:scale-90 transition-all ${shuffle ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'}`}>
           <Shuffle size={20} />
         </button>
         <button onClick={prevTrack} className="text-white active:scale-90 transition-transform">
-          <SkipBack size={34} fill="currentColor" />
+          <SkipBack size={32} fill="currentColor" />
         </button>
         <button onClick={togglePlay}
           className="w-16 h-16 bg-white rounded-full flex items-center justify-center active:scale-95 transition-all shadow-xl">
           {isPlaying
-            ? <Pause size={30} className="text-black" fill="black" />
-            : <Play size={30} className="text-black ml-1" fill="black" />}
+            ? <Pause size={28} className="text-black" fill="black" />
+            : <Play size={28} className="text-black ml-1" fill="black" />}
         </button>
         <button onClick={nextTrack} className="text-white active:scale-90 transition-transform">
-          <SkipForward size={34} fill="currentColor" />
+          <SkipForward size={32} fill="currentColor" />
         </button>
-        <button onClick={cycleRepeat} title={repeatLabel}
+        <button onClick={cycleRepeat}
           className={`p-2 active:scale-90 transition-all relative ${repeat !== 'off' ? 'text-[var(--green)]' : 'text-[var(--text-dim)]'}`}>
           <RepeatIcon size={20} />
           {repeat === 'one' && (

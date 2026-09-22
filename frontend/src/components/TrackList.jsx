@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Clock, Heart, Download, Plus, Pause, MoreHorizontal, ListPlus, Trash2, SkipForward } from 'lucide-react';
+import { Play, Clock, Heart, MoreHorizontal, ListPlus, Trash2, SkipForward, Pause } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import usePlayerStore from '../store/playerStore';
 import db from '../lib/db';
@@ -41,25 +41,18 @@ export default function TrackList({ tracks, title, playlistId, onRemoveTrack }) 
   };
 
   const handlePlay = (track) => {
-    if (currentTrack?.id === track.id) {
-      togglePlay();
-    } else {
-      setQueue(tracks);
-      setTrack(track);
-    }
+    if (currentTrack?.id === track.id) { togglePlay(); }
+    else { setQueue(tracks); setTrack(track); }
   };
 
   const openMenu = (e, track) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setMenuPos({ x: Math.min(rect.left, window.innerWidth - 220), y: rect.bottom + 4 });
+    setMenuPos({ x: Math.min(rect.left, window.innerWidth - 240), y: rect.bottom + 4 });
     setMenuTrack(menuTrack?.id === track.id ? null : track);
   };
 
-  const playNext = (track) => {
-    usePlayerStore.getState().playNext(track);
-    setMenuTrack(null);
-  };
+  const playNext = (track) => { usePlayerStore.getState().playNext(track); setMenuTrack(null); };
 
   const removeFavorite = async (track) => {
     const existing = await db.favorites.where('trackId').equals(track.id).first();
@@ -68,43 +61,29 @@ export default function TrackList({ tracks, title, playlistId, onRemoveTrack }) 
     setMenuTrack(null);
   };
 
-  const removeFromPlaylist = async (track) => {
-    if (onRemoveTrack) {
-      await onRemoveTrack(track);
-    } else if (playlistId) {
-      const existing = await db.playlistTracks.where({ playlistId, trackId: track.id }).first();
-      if (existing) await db.playlistTracks.delete(existing.id);
-    }
-    setMenuTrack(null);
-  };
-
-  const fmt = (s) => {
-    if (!s) return '—';
-    return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
-  };
-
-  const isFav = menuTrack ? favorites.has(menuTrack.id) : false;
-  const isInPlaylist = !!playlistId;
+  const fmt = (s) => { if (!s) return '—'; return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`; };
 
   return (
-    <div className="px-4 sm:px-6 pb-28">
-      {title && <h2 className="text-2xl font-bold mb-4 animate-fadeUp">{title}</h2>}
+    <div>
+      {title && <h2 className="text-xl font-bold text-white mb-4">{title}</h2>}
 
-      <div className="hidden sm:grid grid-cols-[16px_4fr_3fr_minmax(100px,1fr)_minmax(80px,1fr)] gap-4 px-4 py-2
-                      text-[var(--text-dim)] text-[11px] uppercase tracking-wider border-b border-[#1f1f1f] mb-2 animate-fadeIn">
-        <span>#</span><span>Title</span><span>Album</span>
-        <span className="flex justify-end"><Clock size={14} /></span><span></span>
+      {/* Desktop Header */}
+      <div className="hidden sm:grid grid-cols-[16px_4fr_3fr_minmax(100px,1fr)] gap-4 px-4 py-2
+                      text-[var(--text-dim)] text-[11px] uppercase tracking-wider border-b border-[#282828] mb-2">
+        <span className="text-right">#</span><span>Title</span><span>Album</span>
+        <span className="flex justify-end"><Clock size={14} /></span>
       </div>
 
-      <div className="stagger">
+      <div>
         {tracks.map((track, i) => {
           const isCurrent = currentTrack?.id === track.id;
           return (
             <div key={track.id}
-              className={`track-row flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2.5 rounded-lg cursor-pointer group
-                ${isCurrent ? 'bg-[#1a1a1a]' : 'hover:bg-[#141414]'}`}
+              className={`flex items-center gap-3 sm:gap-4 px-4 py-2 rounded-md cursor-pointer group
+                ${isCurrent ? 'bg-[#1a1a1a]' : 'hover:bg-[#1a1a1a]'}`}
               onClick={() => handlePlay(track)}>
 
+              {/* Number / Play */}
               <span className="text-[var(--text-dim)] text-sm w-6 text-center shrink-0 hidden sm:block group-hover:hidden tabular-nums">
                 {isCurrent && isPlaying ? (
                   <span className="playing-indicator flex items-end justify-center h-4">
@@ -113,32 +92,32 @@ export default function TrackList({ tracks, title, playlistId, onRemoveTrack }) 
                 ) : i + 1}
               </span>
               <button className="hidden sm:block group-hover:block text-white w-6 text-center shrink-0" onClick={(e) => { e.stopPropagation(); handlePlay(track); }}>
-                {isCurrent && isPlaying
-                  ? <Pause size={14} fill="white" className="mx-auto" />
-                  : <Play size={14} fill="white" className="mx-auto" />}
+                {isCurrent && isPlaying ? <Pause size={14} fill="white" className="mx-auto" /> : <Play size={14} fill="white" className="mx-auto" />}
               </button>
 
+              {/* Thumbnail + Info */}
               <img src={track.thumbnail}
-                className={`w-10 h-10 rounded-lg object-cover shrink-0 transition-shadow ${isCurrent ? 'shadow-lg shadow-black/40' : ''}`} alt="" />
+                className={`w-10 h-10 rounded object-cover shrink-0 ${isCurrent ? 'shadow-md' : ''}`} alt="" />
               <div className="min-w-0 flex-1">
                 <p className={`text-sm font-medium truncate ${isCurrent ? 'text-[var(--green)]' : 'text-white'}`}>{track.title}</p>
-                <p className="text-xs text-[var(--text-dim)] truncate"
+                <p className="text-xs text-[var(--text-dim)] truncate hover:underline cursor-pointer hover:text-white"
                   onClick={(e) => { e.stopPropagation(); if (track.artistId) navigate(`/artist/${track.artistId}`); }}>
                   {track.artist}
                 </p>
               </div>
 
-              <span className="text-sm text-[var(--text-dim)] truncate hidden md:block flex-1">{track.album || '—'}</span>
+              {/* Album (desktop) */}
+              <span className="text-sm text-[var(--text-dim)] truncate hidden md:block">{track.album || '—'}</span>
 
-              <span className="text-sm text-[var(--text-dim)] tabular-nums shrink-0">{fmt(track.duration)}</span>
-
-              <div className="flex items-center gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
+              {/* Duration + Actions */}
+              <div className="flex items-center gap-3 shrink-0">
                 <button onClick={(e) => toggleFavorite(e, track)}
-                  className={`transition-colors ${favorites.has(track.id) ? 'text-[var(--green)]' : 'text-[var(--text-dim)] hover:text-white'}`}>
+                  className={`transition-colors ${favorites.has(track.id) ? 'text-[var(--green)]' : 'text-transparent group-hover:text-[var(--text-dim)] hover:text-white'}`}>
                   <Heart size={14} fill={favorites.has(track.id) ? 'currentColor' : 'none'} />
                 </button>
+                <span className="text-sm text-[var(--text-dim)] tabular-nums hidden sm:block">{fmt(track.duration)}</span>
                 <button onClick={(e) => openMenu(e, track)}
-                  className="text-[var(--text-dim)] hover:text-white transition-colors">
+                  className="text-[var(--text-dim)] hover:text-white transition-colors opacity-0 group-hover:opacity-100">
                   <MoreHorizontal size={16} />
                 </button>
               </div>
@@ -150,43 +129,43 @@ export default function TrackList({ tracks, title, playlistId, onRemoveTrack }) 
       {/* Context Menu */}
       {menuTrack && (
         <div ref={menuRef}
-          className="fixed z-[150] bg-[#1f1f1f] rounded-xl shadow-2xl border border-[#2a2a2a] py-2 w-56 animate-fadeIn"
+          className="fixed z-[150] bg-[#282828] rounded-lg shadow-2xl py-2 w-60 animate-fadeIn"
           style={{ left: menuPos.x, top: menuPos.y }}>
-          <div className="px-4 py-2 border-b border-[#2a2a2a]">
-            <p className="text-xs font-semibold text-white truncate">{menuTrack.title}</p>
-            <p className="text-[10px] text-[var(--text-dim)] truncate">{menuTrack.artist}</p>
+          <div className="px-4 py-2 border-b border-[#3e3e3e]">
+            <p className="text-sm font-bold text-white truncate">{menuTrack.title}</p>
+            <p className="text-xs text-[var(--text-dim)] truncate">{menuTrack.artist}</p>
           </div>
 
           <button onClick={() => playNext(menuTrack)}
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#3e3e3e] transition-colors">
             <SkipForward size={16} className="text-[var(--text-dim)]" />
             Als nächstes abspielen
           </button>
 
-          {isFav ? (
+          {favorites.has(menuTrack.id) ? (
             <button onClick={() => removeFavorite(menuTrack)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
-              <Trash2 size={16} className="text-red-400" />
-              Aus Favoriten entfernen
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#3e3e3e] transition-colors">
+              <Trash2 size={16} className="text-[var(--text-dim)]" />
+              Aus Liked Songs entfernen
             </button>
           ) : (
             <button onClick={() => { toggleFavorite(new Event('click'), menuTrack); setMenuTrack(null); }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#3e3e3e] transition-colors">
               <Heart size={16} className="text-[var(--text-dim)]" />
-              Zu Favoriten hinzufügen
+              Zu Liked Songs hinzufügen
             </button>
           )}
 
-          {isInPlaylist && (
-            <button onClick={() => removeFromPlaylist(menuTrack)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
-              <Trash2 size={16} className="text-red-400" />
+          {playlistId && (
+            <button onClick={() => { onRemoveTrack?.(menuTrack); setMenuTrack(null); }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#3e3e3e] transition-colors">
+              <Trash2 size={16} className="text-[var(--text-dim)]" />
               Aus Playlist entfernen
             </button>
           )}
 
           <button onClick={() => { navigator.clipboard.writeText(menuTrack.title + ' ' + menuTrack.artist); setMenuTrack(null); }}
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#2a2a2a] transition-colors">
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white hover:bg-[#3e3e3e] transition-colors">
             <ListPlus size={16} className="text-[var(--text-dim)]" />
             Song-Name kopieren
           </button>

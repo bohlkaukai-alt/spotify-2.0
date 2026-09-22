@@ -11,27 +11,21 @@ export default function Player({ onFullscreen }) {
   const lastTrackId = useRef(null);
   const [ytReady, setYtReady] = useState(false);
 
-  // --- HTML5 Audio Element (primary player) ---
   useEffect(() => {
     const audio = new Audio();
     audio.preload = 'auto';
     audioRef.current = audio;
-
     audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
-    audio.addEventListener('timeupdate', () => {
-      if (!audio.seeking) setProgress(audio.currentTime);
-    });
+    audio.addEventListener('timeupdate', () => { if (!audio.seeking) setProgress(audio.currentTime); });
     audio.addEventListener('ended', () => {
       const st = usePlayerStore.getState();
       if (st.repeat === 'one') { audio.currentTime = 0; audio.play(); }
       else st.nextTrack();
     });
     audio.addEventListener('playing', () => usePlayerStore.getState().setIsPlaying(true));
-
     return () => { audio.pause(); audio.removeAttribute('src'); audio.load(); };
   }, []);
 
-  // --- YouTube IFrame API (always loaded in background) ---
   useEffect(() => {
     if (window.YT && window.YT.Player) { initYT(); return; }
     const tag = document.createElement('script');
@@ -40,11 +34,7 @@ export default function Player({ onFullscreen }) {
     window.onYouTubeIframeAPIReady = () => { setYtReady(true); initYT(); };
   }, []);
 
-  useEffect(() => {
-    if (ytReady && !ytPlayer.current && playerRef.current) {
-      initYT();
-    }
-  }, [ytReady]);
+  useEffect(() => { if (ytReady && !ytPlayer.current && playerRef.current) initYT(); }, [ytReady]);
 
   const initYT = () => {
     if (ytPlayer.current || !playerRef.current) return;
@@ -63,19 +53,14 @@ export default function Player({ onFullscreen }) {
           },
         },
       });
-    } catch (err) {
-      console.warn('YT Player init failed:', err);
-    }
+    } catch {}
   };
 
-  // --- Load & Play Track ---
   useEffect(() => {
     if (!currentTrack) return;
     if (lastTrackId.current === currentTrack.id) return;
     lastTrackId.current = currentTrack.id;
-
     const loadTrack = async () => {
-      // If track has a stream URL (Audius), play via <audio>
       if (currentTrack.streamUrl && audioRef.current) {
         try {
           audioRef.current.src = currentTrack.streamUrl;
@@ -84,96 +69,63 @@ export default function Player({ onFullscreen }) {
           usePlayerStore.getState().setIsPlaying(true);
           updateMediaSession(currentTrack);
           return;
-        } catch (err) {
-          console.warn('Audio play failed, falling back to YouTube:', err);
-        }
+        } catch {}
       }
-
-      // YouTube fallback
       setProgress(0);
       updateMediaSession(currentTrack);
       if (ytPlayer.current && ytReady) {
         ytPlayer.current.loadVideoById({ videoId: currentTrack.id, suggestedQuality: 'small' });
       }
     };
-
     loadTrack();
   }, [currentTrack?.id]);
 
-  // --- Play / Pause ---
   useEffect(() => {
     if (!currentTrack) return;
     const hasStream = currentTrack.streamUrl && audioRef.current?.src;
-
-    if (hasStream) {
-      if (isPlaying) audioRef.current.play().catch(() => {});
-      else audioRef.current.pause();
-    } else if (ytPlayer.current && ytReady) {
-      if (isPlaying) ytPlayer.current.playVideo();
-      else ytPlayer.current.pauseVideo();
-    }
+    if (hasStream) { if (isPlaying) audioRef.current.play().catch(() => {}); else audioRef.current.pause(); }
+    else if (ytPlayer.current && ytReady) { if (isPlaying) ytPlayer.current.playVideo(); else ytPlayer.current.pauseVideo(); }
   }, [isPlaying, currentTrack, ytReady]);
 
-  // --- Volume ---
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
     if (ytPlayer.current) ytPlayer.current.setVolume(volume * 100);
   }, [volume]);
 
-  // --- Seek ---
   useEffect(() => {
     window.__ytSeek = (time) => {
-      if (audioRef.current?.src && currentTrack?.streamUrl) {
-        audioRef.current.currentTime = time;
-        setProgress(time);
-      } else if (ytPlayer.current) {
-        ytPlayer.current.seekTo(time, true);
-        setProgress(time);
-      }
+      if (audioRef.current?.src && currentTrack?.streamUrl) { audioRef.current.currentTime = time; setProgress(time); }
+      else if (ytPlayer.current) { ytPlayer.current.seekTo(time, true); setProgress(time); }
     };
   }, [currentTrack?.streamUrl]);
 
-  // --- Background: resume on visibility change ---
   useEffect(() => {
     const handle = () => {
       if (document.visibilityState !== 'visible') return;
       const st = usePlayerStore.getState();
       if (!st.isPlaying) return;
       const hasStream = st.currentTrack?.streamUrl && audioRef.current?.src;
-      if (hasStream && audioRef.current?.paused && !audioRef.current.ended) {
-        audioRef.current.play().catch(() => {});
-      }
-      if (!hasStream && ytPlayer.current) {
-        const state = ytPlayer.current.getPlayerState?.();
-        if (state !== 1) ytPlayer.current.playVideo();
-      }
+      if (hasStream && audioRef.current?.paused && !audioRef.current.ended) audioRef.current.play().catch(() => {});
+      if (!hasStream && ytPlayer.current) { const s = ytPlayer.current.getPlayerState?.(); if (s !== 1) ytPlayer.current.playVideo(); }
     };
     document.addEventListener('visibilitychange', handle);
     return () => document.removeEventListener('visibilitychange', handle);
   }, []);
 
-  // --- Heartbeat: keep alive every 2s ---
   useEffect(() => {
     if (!isPlaying) return;
     const iv = setInterval(() => {
       const st = usePlayerStore.getState();
       if (!st.isPlaying) return;
       const hasStream = st.currentTrack?.streamUrl && audioRef.current?.src;
-      if (hasStream && audioRef.current?.paused && !audioRef.current.ended) {
-        audioRef.current.play().catch(() => {});
-      }
-      if (!hasStream && ytPlayer.current) {
-        const state = ytPlayer.current.getPlayerState?.();
-        if (state === 2 || state === -1) ytPlayer.current.playVideo();
-      }
+      if (hasStream && audioRef.current?.paused && !audioRef.current.ended) audioRef.current.play().catch(() => {});
+      if (!hasStream && ytPlayer.current) { const s = ytPlayer.current.getPlayerState?.(); if (s === 2 || s === -1) ytPlayer.current.playVideo(); }
     }, 2000);
     return () => clearInterval(iv);
   }, [isPlaying]);
 
-  // --- Web Audio API keep-alive ---
   useEffect(() => {
-    const ctxRef = { current: null };
-    const oscRef = { current: null };
+    const ctxRef = { current: null }, oscRef = { current: null };
     const keepAlive = () => {
       if (ctxRef.current) return;
       try {
@@ -182,9 +134,7 @@ export default function Player({ onFullscreen }) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         gain.gain.value = 0;
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
+        osc.connect(gain); gain.connect(ctx.destination); osc.start();
         oscRef.current = osc;
       } catch {}
     };
@@ -193,17 +143,14 @@ export default function Player({ onFullscreen }) {
     return () => {
       document.removeEventListener('touchstart', keepAlive);
       document.removeEventListener('click', keepAlive);
-      oscRef.current?.stop();
-      ctxRef.current?.close();
+      oscRef.current?.stop(); ctxRef.current?.close();
     };
   }, []);
 
-  // --- Media Session API ---
   const updateMediaSession = (track) => {
     if (!('mediaSession' in navigator) || !track) return;
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.title,
-      artist: track.artist,
+      title: track.title, artist: track.artist,
       artwork: track.thumbnail ? [{ src: track.thumbnail, sizes: '300x300', type: 'image/jpeg' }] : [],
     });
   };
@@ -215,32 +162,13 @@ export default function Player({ onFullscreen }) {
     navigator.mediaSession.setActionHandler('pause', () => usePlayerStore.getState().setIsPlaying(false));
     navigator.mediaSession.setActionHandler('previoustrack', () => usePlayerStore.getState().prevTrack());
     navigator.mediaSession.setActionHandler('nexttrack', () => usePlayerStore.getState().nextTrack());
-    navigator.mediaSession.setActionHandler('seekto', (d) => {
-      if (d.seekTime != null) {
-        if (window.__ytSeek) window.__ytSeek(d.seekTime);
-      }
-    });
-    navigator.mediaSession.setActionHandler('seekbackward', (d) => {
-      const offset = d.seekOffset || 10;
-      if (window.__ytSeek) window.__ytSeek(Math.max(0, (audioRef.current?.currentTime || 0) - offset));
-    });
-    navigator.mediaSession.setActionHandler('seekforward', (d) => {
-      const offset = d.seekOffset || 10;
-      if (window.__ytSeek) window.__ytSeek((audioRef.current?.currentTime || 0) + offset);
-    });
   }, [currentTrack]);
 
   useEffect(() => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-    }
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
   }, [isPlaying]);
 
-  const fmt = (s) => {
-    if (!s || isNaN(s)) return '0:00';
-    return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
-  };
-
+  const fmt = (s) => { if (!s || isNaN(s)) return '0:00'; return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`; };
   const remaining = duration - progress;
   const RepeatIcon = repeat === 'one' ? Repeat1 : Repeat;
   const VolumeIcon = volume === 0 ? Volume : volume < 0.5 ? Volume1 : Volume2;
@@ -253,50 +181,46 @@ export default function Player({ onFullscreen }) {
     setProgress(t);
   };
 
-  const repeatLabel = repeat === 'all' ? 'Playlist wiederholen' : repeat === 'one' ? 'Song wiederholen' : 'Wiederholen';
-
   return (
     <>
-      {/* YouTube player always mounted but hidden */}
       <div ref={playerRef} style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', pointerEvents: 'none' }} />
 
-      {/* Desktop Player */}
-      <div className="hidden sm:flex h-[72px] bg-[#0d0d0d] border-t border-[#1f1f1f] items-center px-4 z-50 shrink-0 gradient-border">
+      {/* Desktop Player Bar */}
+      <div className="hidden md:flex h-[72px] bg-[#181818] border-t border-[#282828] items-center px-4 z-50 shrink-0">
         {currentTrack ? (
           <>
-            <div className="flex items-center gap-3 w-[30%] min-w-0 cursor-pointer group" onClick={onFullscreen}>
-              <img src={currentTrack.thumbnail}
-                className="w-14 h-14 rounded-lg object-cover shadow-lg group-hover:shadow-xl transition-shadow" alt="" />
+            <div className="flex items-center gap-3 w-[30%] min-w-0">
+              <img src={currentTrack.thumbnail} className="w-14 h-14 rounded-md object-cover shadow-md" alt="" />
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-white truncate group-hover:text-[var(--green)] transition-colors">{currentTrack.title}</p>
-                <p className="text-xs text-[var(--text-dim)] truncate">{currentTrack.artist}</p>
+                <p className="text-[13px] font-medium text-white truncate hover:underline cursor-pointer">{currentTrack.title}</p>
+                <p className="text-[11px] text-[var(--text-dim)] truncate hover:underline cursor-pointer hover:text-white">{currentTrack.artist}</p>
               </div>
             </div>
-            <div className="flex flex-col items-center flex-1 w-auto">
-              <div className="flex items-center gap-4 mb-1">
+            <div className="flex flex-col items-center flex-1 max-w-[45%]">
+              <div className="flex items-center gap-4 mb-1.5">
                 <button onClick={setShuffle}
                   className={`transition-colors ${shuffle ? 'text-[var(--green)]' : 'text-[var(--text-dim)] hover:text-white'}`}>
                   <Shuffle size={16} />
                 </button>
-                <button onClick={prevTrack} className="text-[var(--text)] hover:text-white transition-colors">
-                  <SkipBack size={18} fill="currentColor" />
+                <button onClick={prevTrack} className="text-[var(--text-dim)] hover:text-white transition-colors">
+                  <SkipBack size={16} fill="currentColor" />
                 </button>
                 <button onClick={togglePlay}
-                  className="w-9 h-9 bg-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-md">
-                  {isPlaying ? <Pause size={18} className="text-black" fill="black" />
-                    : <Play size={18} className="text-black ml-0.5" fill="black" />}
+                  className="w-8 h-8 bg-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+                  {isPlaying ? <Pause size={16} className="text-black" fill="black" />
+                    : <Play size={16} className="text-black ml-0.5" fill="black" />}
                 </button>
-                <button onClick={nextTrack} className="text-[var(--text)] hover:text-white transition-colors">
-                  <SkipForward size={18} fill="currentColor" />
+                <button onClick={nextTrack} className="text-[var(--text-dim)] hover:text-white transition-colors">
+                  <SkipForward size={16} fill="currentColor" />
                 </button>
-                <button onClick={cycleRepeat} title={repeatLabel}
+                <button onClick={cycleRepeat}
                   className={`transition-colors ${repeat !== 'off' ? 'text-[var(--green)]' : 'text-[var(--text-dim)] hover:text-white'}`}>
                   <RepeatIcon size={16} />
                 </button>
               </div>
-              <div className="flex items-center gap-2 w-full max-w-md">
+              <div className="flex items-center gap-2 w-full">
                 <span className="text-[11px] text-[var(--text-dim)] w-10 text-right tabular-nums">{fmt(progress)}</span>
-                <div className="player-slider flex-1 h-1 bg-[#3e3e3e] rounded-full cursor-pointer group" onClick={seekTo}>
+                <div className="flex-1 h-1 bg-[#4d4d4d] rounded-full cursor-pointer group hover:h-1.5 transition-all" onClick={seekTo}>
                   <div className="h-full bg-white group-hover:bg-[var(--green)] rounded-full relative transition-colors"
                     style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }}>
                     <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow" />
@@ -308,17 +232,17 @@ export default function Player({ onFullscreen }) {
               </div>
             </div>
             <div className="flex items-center gap-2 w-[30%] justify-end">
-              <VolumeIcon size={16} className="text-[var(--text-dim)]" />
-              <div className="player-slider w-24 h-1 bg-[#3e3e3e] rounded-full cursor-pointer group"
+              <button onClick={onFullscreen} className="text-[var(--text-dim)] hover:text-white transition-colors">
+                <Maximize2 size={14} />
+              </button>
+              <VolumeIcon size={14} className="text-[var(--text-dim)]" />
+              <div className="w-24 h-1 bg-[#4d4d4d] rounded-full cursor-pointer group hover:h-1.5 transition-all"
                 onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setVolume((e.clientX - r.left) / r.width); }}>
                 <div className="h-full bg-white group-hover:bg-[var(--green)] rounded-full relative transition-colors"
                   style={{ width: `${volume * 100}%` }}>
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow" />
                 </div>
               </div>
-              <button onClick={onFullscreen} className="text-[var(--text-dim)] hover:text-white transition-colors ml-1">
-                <Maximize2 size={16} />
-              </button>
             </div>
           </>
         ) : (
@@ -330,22 +254,23 @@ export default function Player({ onFullscreen }) {
 
       {/* Mobile Mini Player */}
       {currentTrack && (
-        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 glass gradient-border"
+        <div className="md:hidden fixed left-0 right-0 z-50 bg-[#382a2a] border-t border-white/5"
+          style={{ bottom: '52px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
           onClick={onFullscreen}>
           <div className="h-[56px] flex items-center gap-3 px-3">
-            <img src={currentTrack.thumbnail} className="w-10 h-10 rounded-lg object-cover shadow" alt="" />
+            <img src={currentTrack.thumbnail} className="w-10 h-10 rounded-md object-cover shadow" alt="" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white truncate">{currentTrack.title}</p>
+              <p className="text-[13px] font-medium text-white truncate">{currentTrack.title}</p>
               <p className="text-[11px] text-[var(--text-dim)] truncate">{currentTrack.artist}</p>
             </div>
             <button onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-              className="w-10 h-10 flex items-center justify-center">
-              {isPlaying ? <Pause size={22} className="text-white" fill="white" />
-                : <Play size={22} className="text-white ml-0.5" fill="white" />}
+              className="w-8 h-8 flex items-center justify-center">
+              {isPlaying ? <Pause size={20} className="text-white" fill="white" />
+                : <Play size={20} className="text-white ml-0.5" fill="white" />}
             </button>
           </div>
-          <div className="h-[2px] bg-[#3e3e3e]">
-            <div className="h-full bg-[var(--green)] transition-all duration-500"
+          <div className="h-[2px] bg-[#4d4d4d]">
+            <div className="h-full bg-white transition-all"
               style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }} />
           </div>
         </div>

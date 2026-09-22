@@ -1,58 +1,83 @@
-import { useState, useEffect } from 'react';
-import { Heart, ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Heart } from 'lucide-react';
 import db from '../lib/db';
-import TrackList from '../components/TrackList';
+import usePlayerStore from '../store/playerStore';
 
 export default function Library() {
   const [favorites, setFavorites] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [playlists, setPlaylists] = useState([]);
   const navigate = useNavigate();
+  const setTrack = usePlayerStore((s) => s.setTrack);
+  const setQueue = usePlayerStore((s) => s.setQueue);
 
   useEffect(() => {
-    loadFavorites();
+    db.favorites.orderBy('addedAt').reverse().then(setFavorites);
+    db.playlists.toArray().then(setPlaylists);
   }, []);
 
-  const loadFavorites = async () => {
-    const favs = await db.favorites.orderBy('addedAt').reverse().toArray();
-    setFavorites(favs.map((f) => ({
-      id: f.trackId,
-      title: f.title,
-      artist: f.artist,
-      thumbnail: f.thumbnail,
-    })));
-    setLoading(false);
-  };
-
   return (
-    <div className="p-4 sm:p-6 pb-28">
-      <div className="flex items-center gap-4 mb-6 animate-fadeUp">
-        <button onClick={() => navigate(-1)}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1a1a1a] hover:bg-[#242424] transition-colors shrink-0">
-          <ArrowLeft size={18} className="text-white" />
+    <div className="pb-28 md:pb-6">
+      <div className="flex items-center gap-4 mb-6">
+        <button onClick={() => navigate(-1)} className="md:hidden w-10 h-10 flex items-center justify-center">
+          <ChevronLeft size={24} className="text-white" />
         </button>
-        <div className="w-14 h-14 bg-gradient-to-br from-[#503750] to-[#DC148C] rounded-xl flex items-center justify-center shadow-lg shrink-0">
-          <Heart size={24} fill="white" className="text-white" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold truncate">Deine Favoriten</h1>
-          <p className="text-sm text-[var(--text-dim)]">{favorites.length} Songs</p>
-        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-white">Deine Bibliothek</h1>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 border-[var(--green)] border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : favorites.length === 0 ? (
-        <div className="text-center py-20 text-[var(--text-dim)] animate-fadeUp">
-          <Heart size={48} className="mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-semibold mb-1 text-white">Noch keine Favoriten</p>
-          <p className="text-sm">Herz-Klicke auf Songs, um sie hier zu speichern</p>
-        </div>
-      ) : (
-        <TrackList tracks={favorites} />
-      )}
+      {/* Liked Songs */}
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-white mb-4">Lieblingssongs</h2>
+        {favorites.length === 0 ? (
+          <p className="text-sm text-[var(--text-dim)]">Noch keine Songs geliked</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {favorites.map((fav) => (
+              <div key={fav.id}
+                className="flex items-center gap-3 p-2 rounded-md hover:bg-[#1a1a1a] cursor-pointer group transition-colors"
+                onClick={() => {
+                  db.favorites.toArray().then(favs => {
+                    const tracks = favs.map(f => ({ id: f.trackId, title: f.title, artist: f.artist, thumbnail: f.thumbnail, streamUrl: null }));
+                    setQueue(tracks);
+                    setTrack(tracks.find(t => t.id === fav.trackId) || tracks[0]);
+                  });
+                }}>
+                <img src={fav.thumbnail} alt="" className="w-12 h-12 rounded-md object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-white truncate">{fav.title}</p>
+                  <p className="text-xs text-[var(--text-dim)] truncate">{fav.artist}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Playlists */}
+      <div>
+        <h2 className="text-xl font-bold text-white mb-4">Playlists</h2>
+        {playlists.length === 0 ? (
+          <p className="text-sm text-[var(--text-dim)]">Noch keine Playlists erstellt</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {playlists.map((pl) => (
+              <div key={pl.id}
+                className="flex items-center gap-3 p-2 rounded-md hover:bg-[#1a1a1a] cursor-pointer group transition-colors"
+                onClick={() => navigate(`/playlist/${pl.id}`)}>
+                <div className="w-12 h-12 rounded-md bg-[#282828] flex items-center justify-center">
+                  <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16" className="text-[var(--text-dim)]">
+                    <path d="M15.25 8a.75.75 0 0 1-.75.75H8.75v5.75a.75.75 0 0 1-1.5 0V8.75H1.5a.75.75 0 0 1 0-1.5h5.75V1.5a.75.75 0 0 1 1.5 0v5.75h5.75a.75.75 0 0 1 .75.75z"/>
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{pl.name}</p>
+                  <p className="text-xs text-[var(--text-dim)]">Playlist</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
