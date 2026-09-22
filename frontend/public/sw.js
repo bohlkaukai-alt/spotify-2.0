@@ -1,4 +1,4 @@
-const CACHE = 'spotify-v3';
+const CACHE = 'spotify-v4';
 const PRECACHE = ['/', '/index.html'];
 
 self.addEventListener('install', (e) => {
@@ -14,7 +14,7 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.url.includes('/api/')) return;
+  if (e.request.url.includes('/api/') || e.request.url.includes('audius.co')) return;
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(res => {
       const clone = res.clone();

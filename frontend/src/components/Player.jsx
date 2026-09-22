@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Volume, Volume1, Volume2, Maximize2 } from 'lucide-react';
 import usePlayerStore from '../store/playerStore';
-import { getStreamUrl } from '../lib/api';
 
 export default function Player({ onFullscreen }) {
   const { currentTrack, isPlaying, volume, repeat, shuffle, progress, duration,
@@ -9,14 +8,15 @@ export default function Player({ onFullscreen }) {
   const audioRef = useRef(null);
   const playerRef = useRef(null);
   const ytPlayer = useRef(null);
-  const [ready, setReady] = useState(false);
-  const [useAudio, setUseAudio] = useState(true);
   const lastTrackId = useRef(null);
+  const [ytReady, setYtReady] = useState(false);
+  const [useYt, setUseYt] = useState(false);
 
-  // --- HTML5 Audio Element (for background playback) ---
+  // --- HTML5 Audio Element (primary player - background capable) ---
   useEffect(() => {
     const audio = new Audio();
     audio.preload = 'auto';
+    audio.crossOrigin = 'anonymous';
     audioRef.current = audio;
 
     audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
@@ -29,25 +29,24 @@ export default function Player({ onFullscreen }) {
       else st.nextTrack();
     });
     audio.addEventListener('error', (e) => {
-      console.warn('Audio playback failed, switching to YouTube');
-      setUseAudio(false);
+      console.warn('Audio element error, trying YouTube fallback');
+      setUseYt(true);
     });
-    audio.addEventListener('playing', () => {
-      usePlayerStore.getState().setIsPlaying(true);
-    });
+    audio.addEventListener('playing', () => usePlayerStore.getState().setIsPlaying(true));
+    audio.addEventListener('pause', () => {});
 
     return () => { audio.pause(); audio.removeAttribute('src'); audio.load(); };
   }, []);
 
-  // --- YouTube IFrame Fallback ---
+  // --- YouTube IFrame API (fallback) ---
   useEffect(() => {
-    if (useAudio) return;
+    if (!useYt) return;
     if (window.YT && window.YT.Player) { initYT(); return; }
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
     document.head.appendChild(tag);
-    window.onYouTubeIframeAPIReady = () => initYT();
-  }, [useAudio]);
+    window.onYouTubeIframeAPIReady = () => { setYtReady(true); initYT(); };
+  }, [useYt]);
 
   const initYT = () => {
     if (ytPlayer.current || !playerRef.current) return;
@@ -55,6 +54,7 @@ export default function Player({ onFullscreen }) {
       height: '1', width: '1',
       playerVars: { autoplay: 0, controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1 },
       events: {
+        onReady: () => setYtReady(true),
         onStateChange: (e) => {
           if (e.data === window.YT.PlayerState.ENDED) {
             const st = usePlayerStore.getState();
@@ -73,66 +73,64 @@ export default function Player({ onFullscreen }) {
     lastTrackId.current = currentTrack.id;
 
     const loadTrack = async () => {
-      if (useAudio && audioRef.current) {
+      // If track has a stream URL (Audius), play via <audio>
+      if (currentTrack.streamUrl && audioRef.current) {
+        setUseYt(false);
         try {
-          const res = await fetch(getStreamUrl(currentTrack.id));
-          const data = await res.json();
-          if (data.url) {
-            audioRef.current.src = data.url;
-            audioRef.current.load();
-            audioRef.current.play().then(() => {
-              usePlayerStore.getState().setIsPlaying(true);
-            }).catch(() => {
-              console.warn('Autoplay blocked, waiting for user interaction');
-            });
-            return;
-          }
+          audioRef.current.src = currentTrack.streamUrl;
+          audioRef.current.load();
+          await audioRef.current.play();
+          usePlayerStore.getState().setIsPlaying(true);
+          // Update Media Session
+          updateMediaSession(currentTrack);
+          return;
         } catch (err) {
-          console.warn('Audio stream fetch failed:', err);
+          console.warn('Audio play failed:', err);
         }
-        // If audio failed, switch to YouTube
-        setUseAudio(false);
       }
 
-      if (!useAudio && ytPlayer.current) {
+      // YouTube fallback
+      setUseYt(true);
+      if (ytPlayer.current && ytReady) {
         ytPlayer.current.loadVideoById({ videoId: currentTrack.id, suggestedQuality: 'small' });
         setProgress(0);
+        updateMediaSession(currentTrack);
       }
     };
 
     loadTrack();
-  }, [currentTrack?.id, useAudio]);
+  }, [currentTrack?.id]);
 
   // --- Play / Pause ---
   useEffect(() => {
     if (!currentTrack) return;
-    if (useAudio && audioRef.current) {
+    if (!useYt && audioRef.current) {
       if (isPlaying) audioRef.current.play().catch(() => {});
       else audioRef.current.pause();
-    } else if (ytPlayer.current) {
+    } else if (useYt && ytPlayer.current && ytReady) {
       if (isPlaying) ytPlayer.current.playVideo();
       else ytPlayer.current.pauseVideo();
     }
-  }, [isPlaying, currentTrack]);
+  }, [isPlaying, currentTrack, useYt, ytReady]);
 
   // --- Volume ---
   useEffect(() => {
-    if (useAudio && audioRef.current) audioRef.current.volume = volume;
+    if (!useYt && audioRef.current) audioRef.current.volume = volume;
     if (ytPlayer.current) ytPlayer.current.setVolume(volume * 100);
-  }, [volume, useAudio]);
+  }, [volume, useYt]);
 
   // --- Seek ---
   useEffect(() => {
     window.__ytSeek = (time) => {
-      if (useAudio && audioRef.current) {
+      if (!useYt && audioRef.current) {
         audioRef.current.currentTime = time;
         setProgress(time);
-      } else if (ytPlayer.current) {
+      } else if (useYt && ytPlayer.current) {
         ytPlayer.current.seekTo(time, true);
         setProgress(time);
       }
     };
-  }, [useAudio]);
+  }, [useYt]);
 
   // --- Background: resume on visibility change ---
   useEffect(() => {
@@ -140,36 +138,36 @@ export default function Player({ onFullscreen }) {
       if (document.visibilityState !== 'visible') return;
       const st = usePlayerStore.getState();
       if (!st.isPlaying) return;
-      if (useAudio && audioRef.current?.paused && !audioRef.current.ended) {
+      if (!useYt && audioRef.current?.paused && !audioRef.current.ended) {
         audioRef.current.play().catch(() => {});
       }
-      if (!useAudio && ytPlayer.current) {
+      if (useYt && ytPlayer.current) {
         const state = ytPlayer.current.getPlayerState?.();
         if (state !== 1) ytPlayer.current.playVideo();
       }
     };
     document.addEventListener('visibilitychange', handle);
     return () => document.removeEventListener('visibilitychange', handle);
-  }, [useAudio]);
+  }, [useYt]);
 
-  // --- Heartbeat: keep audio alive every 2s ---
+  // --- Heartbeat: keep alive every 2s ---
   useEffect(() => {
     if (!isPlaying) return;
     const iv = setInterval(() => {
       const st = usePlayerStore.getState();
       if (!st.isPlaying) return;
-      if (useAudio && audioRef.current?.paused && !audioRef.current.ended) {
+      if (!useYt && audioRef.current?.paused && !audioRef.current.ended) {
         audioRef.current.play().catch(() => {});
       }
-      if (!useAudio && ytPlayer.current) {
+      if (useYt && ytPlayer.current) {
         const state = ytPlayer.current.getPlayerState?.();
         if (state === 2 || state === -1) ytPlayer.current.playVideo();
       }
     }, 2000);
     return () => clearInterval(iv);
-  }, [isPlaying, useAudio]);
+  }, [isPlaying, useYt]);
 
-  // --- Web Audio API keep-alive (prevents browser suspension) ---
+  // --- Web Audio API keep-alive ---
   useEffect(() => {
     const ctxRef = { current: null };
     const oscRef = { current: null };
@@ -197,40 +195,50 @@ export default function Player({ onFullscreen }) {
     };
   }, []);
 
-  // --- Media Session API (lock screen + background controls) ---
+  // --- Media Session API ---
+  const updateMediaSession = (track) => {
+    if (!('mediaSession' in navigator) || !track) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title,
+      artist: track.artist,
+      artwork: track.thumbnail ? [{ src: track.thumbnail, sizes: '300x300', type: 'image/jpeg' }] : [],
+    });
+  };
+
   useEffect(() => {
     if (!('mediaSession' in navigator) || !currentTrack) return;
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentTrack.title, artist: currentTrack.artist,
-      artwork: [{ src: currentTrack.thumbnail, sizes: '300x300', type: 'image/jpeg' }],
-    });
-    navigator.mediaSession.setActionHandler('play', () => {
-      usePlayerStore.getState().setIsPlaying(true);
-    });
-    navigator.mediaSession.setActionHandler('pause', () => {
-      usePlayerStore.getState().setIsPlaying(false);
-    });
+    updateMediaSession(currentTrack);
+
+    navigator.mediaSession.setActionHandler('play', () => usePlayerStore.getState().setIsPlaying(true));
+    navigator.mediaSession.setActionHandler('pause', () => usePlayerStore.getState().setIsPlaying(false));
     navigator.mediaSession.setActionHandler('previoustrack', () => usePlayerStore.getState().prevTrack());
     navigator.mediaSession.setActionHandler('nexttrack', () => usePlayerStore.getState().nextTrack());
     navigator.mediaSession.setActionHandler('seekto', (d) => {
       if (d.seekTime != null) {
-        if (useAudio && audioRef.current) audioRef.current.currentTime = d.seekTime;
+        if (!useYt && audioRef.current) audioRef.current.currentTime = d.seekTime;
         else if (ytPlayer.current) ytPlayer.current.seekTo(d.seekTime, true);
         setProgress(d.seekTime);
       }
     });
     navigator.mediaSession.setActionHandler('seekbackward', (d) => {
       const offset = d.seekOffset || 10;
-      if (useAudio && audioRef.current) audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - offset);
+      if (!useYt && audioRef.current) audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - offset);
       else if (ytPlayer.current) ytPlayer.current.seekTo(Math.max(0, (ytPlayer.current.getCurrentTime?.() || 0) - offset), true);
     });
     navigator.mediaSession.setActionHandler('seekforward', (d) => {
       const offset = d.seekOffset || 10;
-      if (useAudio && audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + offset);
+      if (!useYt && audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + offset);
       else if (ytPlayer.current) ytPlayer.current.seekTo((ytPlayer.current.getCurrentTime?.() || 0) + offset, true);
     });
     navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-  }, [currentTrack, isPlaying, useAudio]);
+  }, [currentTrack, isPlaying, useYt]);
+
+  // --- Update playbackState when isPlaying changes ---
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [isPlaying]);
 
   const fmt = (s) => {
     if (!s || isNaN(s)) return '0:00';
@@ -245,7 +253,7 @@ export default function Player({ onFullscreen }) {
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
     const t = pct * (duration || 0);
-    if (useAudio && audioRef.current) audioRef.current.currentTime = t;
+    if (!useYt && audioRef.current) audioRef.current.currentTime = t;
     else if (ytPlayer.current) ytPlayer.current.seekTo(t, true);
     setProgress(t);
   };
@@ -254,7 +262,7 @@ export default function Player({ onFullscreen }) {
 
   return (
     <>
-      {!useAudio && <div ref={playerRef} style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }} />}
+      {useYt && <div ref={playerRef} style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }} />}
 
       {/* Desktop Player */}
       <div className="hidden sm:flex h-[72px] bg-[#0d0d0d] border-t border-[#1f1f1f] items-center px-4 z-50 shrink-0 gradient-border">
