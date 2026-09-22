@@ -10,13 +10,11 @@ export default function Player({ onFullscreen }) {
   const ytPlayer = useRef(null);
   const lastTrackId = useRef(null);
   const [ytReady, setYtReady] = useState(false);
-  const [useYt, setUseYt] = useState(false);
 
-  // --- HTML5 Audio Element (primary player - background capable) ---
+  // --- HTML5 Audio Element (primary player) ---
   useEffect(() => {
     const audio = new Audio();
     audio.preload = 'auto';
-    audio.crossOrigin = 'anonymous';
     audioRef.current = audio;
 
     audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
@@ -28,42 +26,46 @@ export default function Player({ onFullscreen }) {
       if (st.repeat === 'one') { audio.currentTime = 0; audio.play(); }
       else st.nextTrack();
     });
-    audio.addEventListener('error', (e) => {
-      console.warn('Audio element error, trying YouTube fallback');
-      setUseYt(true);
-    });
     audio.addEventListener('playing', () => usePlayerStore.getState().setIsPlaying(true));
-    audio.addEventListener('pause', () => {});
 
     return () => { audio.pause(); audio.removeAttribute('src'); audio.load(); };
   }, []);
 
-  // --- YouTube IFrame API (fallback) ---
+  // --- YouTube IFrame API (always loaded in background) ---
   useEffect(() => {
-    if (!useYt) return;
     if (window.YT && window.YT.Player) { initYT(); return; }
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
     document.head.appendChild(tag);
     window.onYouTubeIframeAPIReady = () => { setYtReady(true); initYT(); };
-  }, [useYt]);
+  }, []);
+
+  useEffect(() => {
+    if (ytReady && !ytPlayer.current && playerRef.current) {
+      initYT();
+    }
+  }, [ytReady]);
 
   const initYT = () => {
     if (ytPlayer.current || !playerRef.current) return;
-    ytPlayer.current = new window.YT.Player(playerRef.current, {
-      height: '1', width: '1',
-      playerVars: { autoplay: 0, controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1 },
-      events: {
-        onReady: () => setYtReady(true),
-        onStateChange: (e) => {
-          if (e.data === window.YT.PlayerState.ENDED) {
-            const st = usePlayerStore.getState();
-            if (st.repeat === 'one') { ytPlayer.current.seekTo(0, true); ytPlayer.current.playVideo(); }
-            else st.nextTrack();
-          }
+    try {
+      ytPlayer.current = new window.YT.Player(playerRef.current, {
+        height: '1', width: '1',
+        playerVars: { autoplay: 0, controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1 },
+        events: {
+          onReady: () => setYtReady(true),
+          onStateChange: (e) => {
+            if (e.data === window.YT.PlayerState.ENDED) {
+              const st = usePlayerStore.getState();
+              if (st.repeat === 'one') { ytPlayer.current.seekTo(0, true); ytPlayer.current.playVideo(); }
+              else st.nextTrack();
+            }
+          },
         },
-      },
-    });
+      });
+    } catch (err) {
+      console.warn('YT Player init failed:', err);
+    }
   };
 
   // --- Load & Play Track ---
@@ -75,26 +77,23 @@ export default function Player({ onFullscreen }) {
     const loadTrack = async () => {
       // If track has a stream URL (Audius), play via <audio>
       if (currentTrack.streamUrl && audioRef.current) {
-        setUseYt(false);
         try {
           audioRef.current.src = currentTrack.streamUrl;
           audioRef.current.load();
           await audioRef.current.play();
           usePlayerStore.getState().setIsPlaying(true);
-          // Update Media Session
           updateMediaSession(currentTrack);
           return;
         } catch (err) {
-          console.warn('Audio play failed:', err);
+          console.warn('Audio play failed, falling back to YouTube:', err);
         }
       }
 
       // YouTube fallback
-      setUseYt(true);
+      setProgress(0);
+      updateMediaSession(currentTrack);
       if (ytPlayer.current && ytReady) {
         ytPlayer.current.loadVideoById({ videoId: currentTrack.id, suggestedQuality: 'small' });
-        setProgress(0);
-        updateMediaSession(currentTrack);
       }
     };
 
@@ -104,33 +103,35 @@ export default function Player({ onFullscreen }) {
   // --- Play / Pause ---
   useEffect(() => {
     if (!currentTrack) return;
-    if (!useYt && audioRef.current) {
+    const hasStream = currentTrack.streamUrl && audioRef.current?.src;
+
+    if (hasStream) {
       if (isPlaying) audioRef.current.play().catch(() => {});
       else audioRef.current.pause();
-    } else if (useYt && ytPlayer.current && ytReady) {
+    } else if (ytPlayer.current && ytReady) {
       if (isPlaying) ytPlayer.current.playVideo();
       else ytPlayer.current.pauseVideo();
     }
-  }, [isPlaying, currentTrack, useYt, ytReady]);
+  }, [isPlaying, currentTrack, ytReady]);
 
   // --- Volume ---
   useEffect(() => {
-    if (!useYt && audioRef.current) audioRef.current.volume = volume;
+    if (audioRef.current) audioRef.current.volume = volume;
     if (ytPlayer.current) ytPlayer.current.setVolume(volume * 100);
-  }, [volume, useYt]);
+  }, [volume]);
 
   // --- Seek ---
   useEffect(() => {
     window.__ytSeek = (time) => {
-      if (!useYt && audioRef.current) {
+      if (audioRef.current?.src && currentTrack?.streamUrl) {
         audioRef.current.currentTime = time;
         setProgress(time);
-      } else if (useYt && ytPlayer.current) {
+      } else if (ytPlayer.current) {
         ytPlayer.current.seekTo(time, true);
         setProgress(time);
       }
     };
-  }, [useYt]);
+  }, [currentTrack?.streamUrl]);
 
   // --- Background: resume on visibility change ---
   useEffect(() => {
@@ -138,17 +139,18 @@ export default function Player({ onFullscreen }) {
       if (document.visibilityState !== 'visible') return;
       const st = usePlayerStore.getState();
       if (!st.isPlaying) return;
-      if (!useYt && audioRef.current?.paused && !audioRef.current.ended) {
+      const hasStream = st.currentTrack?.streamUrl && audioRef.current?.src;
+      if (hasStream && audioRef.current?.paused && !audioRef.current.ended) {
         audioRef.current.play().catch(() => {});
       }
-      if (useYt && ytPlayer.current) {
+      if (!hasStream && ytPlayer.current) {
         const state = ytPlayer.current.getPlayerState?.();
         if (state !== 1) ytPlayer.current.playVideo();
       }
     };
     document.addEventListener('visibilitychange', handle);
     return () => document.removeEventListener('visibilitychange', handle);
-  }, [useYt]);
+  }, []);
 
   // --- Heartbeat: keep alive every 2s ---
   useEffect(() => {
@@ -156,16 +158,17 @@ export default function Player({ onFullscreen }) {
     const iv = setInterval(() => {
       const st = usePlayerStore.getState();
       if (!st.isPlaying) return;
-      if (!useYt && audioRef.current?.paused && !audioRef.current.ended) {
+      const hasStream = st.currentTrack?.streamUrl && audioRef.current?.src;
+      if (hasStream && audioRef.current?.paused && !audioRef.current.ended) {
         audioRef.current.play().catch(() => {});
       }
-      if (useYt && ytPlayer.current) {
+      if (!hasStream && ytPlayer.current) {
         const state = ytPlayer.current.getPlayerState?.();
         if (state === 2 || state === -1) ytPlayer.current.playVideo();
       }
     }, 2000);
     return () => clearInterval(iv);
-  }, [isPlaying, useYt]);
+  }, [isPlaying]);
 
   // --- Web Audio API keep-alive ---
   useEffect(() => {
@@ -208,32 +211,25 @@ export default function Player({ onFullscreen }) {
   useEffect(() => {
     if (!('mediaSession' in navigator) || !currentTrack) return;
     updateMediaSession(currentTrack);
-
     navigator.mediaSession.setActionHandler('play', () => usePlayerStore.getState().setIsPlaying(true));
     navigator.mediaSession.setActionHandler('pause', () => usePlayerStore.getState().setIsPlaying(false));
     navigator.mediaSession.setActionHandler('previoustrack', () => usePlayerStore.getState().prevTrack());
     navigator.mediaSession.setActionHandler('nexttrack', () => usePlayerStore.getState().nextTrack());
     navigator.mediaSession.setActionHandler('seekto', (d) => {
       if (d.seekTime != null) {
-        if (!useYt && audioRef.current) audioRef.current.currentTime = d.seekTime;
-        else if (ytPlayer.current) ytPlayer.current.seekTo(d.seekTime, true);
-        setProgress(d.seekTime);
+        if (window.__ytSeek) window.__ytSeek(d.seekTime);
       }
     });
     navigator.mediaSession.setActionHandler('seekbackward', (d) => {
       const offset = d.seekOffset || 10;
-      if (!useYt && audioRef.current) audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - offset);
-      else if (ytPlayer.current) ytPlayer.current.seekTo(Math.max(0, (ytPlayer.current.getCurrentTime?.() || 0) - offset), true);
+      if (window.__ytSeek) window.__ytSeek(Math.max(0, (audioRef.current?.currentTime || 0) - offset));
     });
     navigator.mediaSession.setActionHandler('seekforward', (d) => {
       const offset = d.seekOffset || 10;
-      if (!useYt && audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + offset);
-      else if (ytPlayer.current) ytPlayer.current.seekTo((ytPlayer.current.getCurrentTime?.() || 0) + offset, true);
+      if (window.__ytSeek) window.__ytSeek((audioRef.current?.currentTime || 0) + offset);
     });
-    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-  }, [currentTrack, isPlaying, useYt]);
+  }, [currentTrack]);
 
-  // --- Update playbackState when isPlaying changes ---
   useEffect(() => {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
@@ -253,8 +249,7 @@ export default function Player({ onFullscreen }) {
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
     const t = pct * (duration || 0);
-    if (!useYt && audioRef.current) audioRef.current.currentTime = t;
-    else if (ytPlayer.current) ytPlayer.current.seekTo(t, true);
+    if (window.__ytSeek) window.__ytSeek(t);
     setProgress(t);
   };
 
@@ -262,7 +257,8 @@ export default function Player({ onFullscreen }) {
 
   return (
     <>
-      {useYt && <div ref={playerRef} style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }} />}
+      {/* YouTube player always mounted but hidden */}
+      <div ref={playerRef} style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', pointerEvents: 'none' }} />
 
       {/* Desktop Player */}
       <div className="hidden sm:flex h-[72px] bg-[#0d0d0d] border-t border-[#1f1f1f] items-center px-4 z-50 shrink-0 gradient-border">
